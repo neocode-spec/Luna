@@ -1,0 +1,4180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <title>Ore</title>
+
+    <!-- Emerald Faceted Gem Favicon -->
+    <link
+        rel="icon"
+        type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='8,3 16,3 14,8 10,8' fill='%23ccffdd'/%3E%3Cpolygon points='6,3 8,3 10,8 2,9' fill='%2352ff94'/%3E%3Cpolygon points='16,3 18,3 22,9 14,8' fill='%2300e65c'/%3E%3Cpolygon points='10,8 14,8 12,21' fill='%2300ff66'/%3E%3Cpolygon points='2,9 10,8 12,21' fill='%2300b347'/%3E%3Cpolygon points='22,9 14,8 12,21' fill='%23008033'/%3E%3C/svg%3E"
+    >
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: #000000;
+            color: #ececec;
+            font-family:
+                Söhne,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                "Segoe UI",
+                Roboto,
+                Ubuntu,
+                Cantarell,
+                sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Allow selecting actual chat content */
+        textarea,
+        input,
+        .ore-response,
+        .ore-user-bubble,
+        .user-name,
+        .user-plan,
+        .chat-history-title {
+            user-select: text;
+        }
+
+        button {
+            border: none;
+            font-family: inherit;
+        }
+
+        /* ==============================
+           SCROLLBAR
+        ============================== */
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 999px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3e3e3e;
+        }
+
+        /* ==============================
+           APP
+        ============================== */
+
+        #app {
+            width: 100%;
+            min-width: 0;
+            height: 100%;
+            height: 100dvh;
+            display: flex;
+            overflow: hidden;
+            background: #000000;
+            position: relative;
+        }
+
+        .auth-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: grid;
+            place-items: center;
+            overflow-y: auto;
+            padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+            background: radial-gradient(ellipse at 50% 25%, rgba(0,255,102,.10), transparent 48%), #050605;
+        }
+
+        .auth-screen[hidden] { display: none; }
+        .auth-card {
+            width: min(100%, 420px);
+            padding: clamp(24px, 6vw, 40px);
+            border: 1px solid rgba(255,255,255,.09);
+            border-radius: 24px;
+            background: rgba(20,21,20,.96);
+            box-shadow: 0 24px 90px rgba(0,0,0,.48);
+        }
+
+        .auth-brand {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 28px;
+            color: #fff;
+            font-size: 22px;
+            font-weight: 650;
+        }
+
+        .auth-brand svg { width: 26px; height: 26px; filter: drop-shadow(0 0 8px rgba(0,255,102,.35)); }
+        .auth-heading { margin: 0; color: #fff; text-align: center; font-size: clamp(22px, 5vw, 27px); letter-spacing: -.025em; }
+        .auth-description { margin: 9px 0 26px; color: #96969a; text-align: center; font-size: 14px; line-height: 1.55; }
+        .auth-options { display: grid; gap: 11px; }
+
+        .auth-option {
+            width: 100%;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            padding: 11px 16px;
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 12px;
+            background: #f2f2f2;
+            color: #151515;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .15s ease, transform .15s ease;
+        }
+
+        .auth-option:hover { background: #fff; transform: translateY(-1px); }
+        .auth-option:focus-visible, .auth-email-input:focus-visible { outline: 2px solid #00ff66; outline-offset: 3px; }
+        .auth-option svg { width: 19px; height: 19px; flex: 0 0 auto; }
+        .auth-option.apple { background: #111; color: #f5f5f5; border-color: rgba(255,255,255,.18); }
+        .auth-option.apple:hover { background: #202020; }
+        .auth-option.email { background: #202120; color: #eee; border-color: rgba(255,255,255,.13); }
+        .auth-option.email:hover { background: #2a2c2a; }
+        .auth-divider { display: flex; align-items: center; gap: 12px; margin: 7px 0; color: #77777b; font-size: 11px; }
+        .auth-divider::before, .auth-divider::after { height: 1px; flex: 1; background: rgba(255,255,255,.1); content: ""; }
+        .auth-email-form { display: none; gap: 10px; margin-top: 14px; }
+        .auth-email-form.visible { display: grid; }
+        .auth-email-input { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid rgba(255,255,255,.16); border-radius: 11px; outline: none; background: #101110; color: #fff; font: inherit; font-size: 16px; }
+        .auth-email-input::placeholder { color: #77777b; }
+        .auth-email-submit { background: #00e65c; border-color: #00e65c; }
+        .auth-email-submit:hover { background: #29ff7b; }
+        .auth-account-switch { justify-self: center; padding: 8px; border: 0; background: transparent; color: #a5a5a8; font-size: 13px; cursor: pointer; }
+        .auth-account-switch:hover { color: #fff; }
+        .auth-back { justify-self: center; padding: 8px; border: 0; background: transparent; color: #9b9b9b; font-size: 13px; cursor: pointer; }
+        .auth-back:hover { color: #fff; }
+        .auth-status { min-height: 18px; margin: 15px 0 0; color: #b4b4b8; text-align: center; font-size: 12px; line-height: 1.5; }
+        .auth-legal { margin: 22px 0 0; color: #737378; text-align: center; font-size: 11px; line-height: 1.5; }
+
+        @media (max-width: 380px) {
+            .auth-card { padding: 24px 18px; border-radius: 19px; }
+        }
+
+        /* ==============================
+           SIDEBAR
+        ============================== */
+
+        #sidebar {
+            width: 260px;
+            height: 100%;
+            flex-shrink: 0;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            transition:
+                margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+        }
+
+        #sidebar.collapsed {
+            margin-left: -260px;
+        }
+
+        .sidebar-inner {
+            width: 260px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 8px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px 12px;
+        }
+
+        .brand-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9b9b9b;
+            transition:
+                background 0.15s ease,
+                color 0.15s ease;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .icon-btn:hover {
+            background: #171717;
+            color: #ffffff;
+        }
+
+        .nav-section {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-item {
+            width: 100%;
+            min-height: 36px;
+            padding: 0 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #ececec;
+            font-size: 14px;
+            font-weight: 400;
+            transition: background 0.15s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: #171717;
+        }
+
+        .badge-updated {
+            background: #262626;
+            color: #b4b4b4;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 5px;
+            border-radius: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .section-divider {
+            padding: 16px 10px 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666666;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ==============================
+           CHAT HISTORY
+        ============================== */
+
+        #chat-history {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 2px;
+        }
+
+        .chat-history-item {
+            width: 100%;
+            min-height: 36px;
+            padding: 0 8px 0 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            color: #cfcfcf;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .chat-history-item:hover {
+            background: #171717;
+            color: #ffffff;
+        }
+
+        .chat-history-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .chat-history-menu-btn {
+            width: 25px;
+            height: 25px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: #777777;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .chat-history-menu-btn:hover {
+            background: #292929;
+            color: #ffffff;
+        }
+
+        .chat-empty {
+            color: #555555;
+            font-size: 12px;
+            padding: 8px 10px;
+        }
+
+        /* ==============================
+           SIDEBAR BOTTOM
+        ============================== */
+
+        .sidebar-bottom {
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .claim-offer-btn {
+            width: 100%;
+            height: 36px;
+            border-radius: 18px;
+            background: #171717;
+            color: #ececec;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: background 0.15s ease;
+            cursor: pointer;
+        }
+
+        .claim-offer-btn:hover {
+            background: #222222;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            text-align: left;
+        }
+
+        .user-profile:hover {
+            background: #171717;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #ab47bc;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .user-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .user-plan {
+            font-size: 11px;
+            color: #8e8e8e;
+        }
+
+        /* ==============================
+           MAIN
+        ============================== */
+
+        #main {
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #open-sidebar-btn {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 50;
+            display: none;
+            background: #171717;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* ==============================
+           TOP NAV
+        ============================== */
+
+        .top-nav-bar {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 0 16px;
+            flex-shrink: 0;
+        }
+
+        .mode-pill {
+            background: #171717;
+            border-radius: 20px;
+            padding: 3px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .pill-btn {
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #8e8e8e;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .pill-btn.active {
+            background: #262626;
+            color: #ffffff;
+        }
+
+        .top-right-offer {
+            position: absolute;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* ==============================
+           CENTER
+        ============================== */
+
+        .center-container {
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 768px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 20px 40px;
+        }
+
+        .hero-title {
+            font-size: 30px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .hero-subtitle {
+            margin: 0 0 28px;
+            color: #8e8e8e;
+            font-size: 14px;
+            text-align: center;
+            animation: greetingIn .45s ease both;
+        }
+
+        @keyframes greetingIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ==============================
+           CHAT INPUT
+        ============================== */
+
+        .pixel-chat-bar {
+            width: 100%;
+            background: #1c1c1e;
+            border-radius: 32px;
+            padding: 12px 18px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: border-color 0.2s ease;
+        }
+
+        .pixel-chat-bar:focus-within {
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .chat-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 16px;
+            resize: none;
+            min-height: 28px;
+            max-height: 180px;
+            line-height: 1.5;
+            user-select: text;
+        }
+
+        .chat-input::placeholder {
+            color: #8e8e8e;
+        }
+
+        .pixel-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding-top: 4px;
+        }
+
+        .toolbar-left,
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-left { flex: 0 0 auto; }
+        .toolbar-right { min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+        .pixel-icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #2c2c2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e3e3e3;
+            cursor: pointer;
+            transition:
+                background 0.15s ease,
+                transform 0.15s ease;
+        }
+
+        .pixel-icon-btn:hover {
+            background: #3a3a3c;
+            transform: scale(1.04);
+        }
+
+        .pixel-pill-btn {
+            height: 36px;
+            padding: 0 14px;
+            border-radius: 18px;
+            background: #2c2c2e;
+            color: #e3e3e3;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition:
+                background 0.15s ease,
+                border-color 0.15s ease;
+            border: 1px solid transparent;
+        }
+
+        .pixel-pill-btn:hover {
+            background: #3a3a3c;
+        }
+
+        .pixel-pill-btn.active {
+            background: #3a3a3c;
+            border-color: #00ff66;
+            color: #ffffff;
+        }
+
+        /* ==============================
+           MODEL SELECTOR + THINKING LEVEL
+           (sits in the chat bar toolbar)
+        ============================== */
+
+        .model-selector {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .model-btn {
+            height: 36px;
+            padding: 0 10px 0 14px;
+            border-radius: 18px;
+            background: #2c2c2e;
+            color: #e3e3e3;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            transition:
+                background 0.15s ease,
+                border-color 0.15s ease;
+        }
+
+        .model-btn:hover {
+            background: #3a3a3c;
+        }
+
+        .model-btn.open {
+            background: #3a3a3c;
+            border-color: transparent;
+            color: #e3e3e3;
+        }
+
+        .model-btn .model-chevron {
+            transition: transform 0.15s ease;
+        }
+
+        .model-btn.open .model-chevron {
+            transform: rotate(180deg);
+        }
+
+        .model-menu {
+            position: fixed;
+            z-index: 400;
+            min-width: 256px;
+            background: #1c1c1e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 8px;
+            box-shadow: 0 14px 44px rgba(0, 0, 0, 0.65);
+            display: none;
+            user-select: none;
+        }
+
+        .model-menu.show {
+            display: block;
+        }
+
+        .menu-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: transparent;
+            color: #ececec;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.12s ease;
+        }
+
+        .menu-item:hover,
+        .menu-item:focus-visible {
+            background: #2c2c2e;
+            outline: none;
+        }
+
+        .menu-check {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            color: #00ff66;
+            visibility: hidden;
+        }
+
+        .menu-item.selected .menu-check {
+            visibility: visible;
+        }
+
+        /* Padlock for locked models */
+
+        .menu-lock {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            color: #9b9b9b;
+        }
+
+        .menu-item.locked {
+            cursor: not-allowed;
+        }
+
+        .menu-item.locked .menu-title,
+        .menu-item.locked .menu-sub {
+            opacity: 0.75;
+        }
+
+        .thinking-option.locked .menu-title,
+        .thinking-option.locked .menu-sub {
+            color: #6b6b6b;
+            opacity: 1;
+        }
+
+        .thinking-option.locked:hover {
+            background: transparent;
+        }
+
+        .menu-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.3;
+            flex: 1;
+        }
+
+        .menu-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .menu-sub {
+            font-size: 13px;
+            color: #9b9b9b;
+        }
+
+        .menu-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            margin: 6px 8px;
+        }
+
+        .thinking-row {
+            padding-left: 12px;
+        }
+
+        .thinking-row .menu-title {
+            padding-left: 30px;
+        }
+
+        .thinking-row .row-arrow {
+            color: #9b9b9b;
+            flex-shrink: 0;
+            transition: transform 0.15s ease;
+        }
+
+        .thinking-row.open {
+            background: #2c2c2e;
+        }
+
+        .thinking-flyout {
+            position: fixed;
+            min-width: 230px;
+            background: #1c1c1e;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 8px;
+            box-shadow: 0 14px 44px rgba(0, 0, 0, 0.65);
+            display: none;
+        }
+
+        .thinking-flyout.show {
+            display: block;
+        }
+
+        /* On phones / tight spaces the flyout opens inline under the row */
+        .thinking-flyout.inline {
+            position: static;
+            min-width: 0;
+            border: none;
+            box-shadow: none;
+            background: transparent;
+            padding: 2px 0 0 18px;
+        }
+
+        .thinking-row.open .row-arrow.inline-open {
+            transform: rotate(90deg);
+        }
+
+        /* ==============================
+           SEND BUTTON
+        ============================== */
+
+        .send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #00ff66;
+            color: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition:
+                transform 0.15s ease,
+                background 0.15s ease,
+                box-shadow 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background: #24ff7b;
+            transform: scale(1.05);
+            box-shadow: 0 0 14px rgba(0, 255, 102, 0.22);
+        }
+
+        .send-btn:active {
+            transform: scale(0.94);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .send-btn.is-stop {
+            background: #ff5f57;
+            color: #fff;
+            opacity: 1;
+        }
+
+        .stop-square {
+            width: 13px;
+            height: 13px;
+            border-radius: 3px;
+            background: currentColor;
+        }
+
+        .attachment-wrap { position: relative; }
+
+        .attachment-menu {
+            position: absolute;
+            left: 0;
+            bottom: 48px;
+            z-index: 450;
+            width: 270px;
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 18px;
+            background: #202022;
+            box-shadow: 0 16px 44px rgba(0,0,0,.55);
+            opacity: 0;
+            transform: translateY(8px) scale(.98);
+            transform-origin: bottom left;
+            pointer-events: none;
+            transition: opacity .16s ease, transform .16s ease;
+        }
+
+        .attachment-menu.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .attachment-menu-title {
+            padding: 8px 10px 10px;
+            color: #929296;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .attachment-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px;
+            border-radius: 12px;
+            color: #eee;
+            text-align: left;
+            background: transparent;
+        }
+
+        .attachment-option:hover { background: #303033; }
+        .attachment-option-icon { width: 22px; color: #c7c7cb; font-size: 17px; text-align: center; }
+        .attachment-option-copy { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+        .attachment-option-name { font-size: 13px; }
+        .attachment-option-hint { color: #85858a; font-size: 11px; }
+        .coming-soon {
+            padding: 4px 6px;
+            border: 1px solid rgba(0,255,102,.2);
+            border-radius: 999px;
+            color: #00e65c;
+            background: rgba(0,255,102,.07);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        #sidebar.collapsed { margin-left: -260px; }
+        #sidebar.collapsed:hover { margin-left: 0; }
+        #sidebar.collapsed::after {
+            content: "";
+            position: fixed;
+            top: 46%;
+            left: 0;
+            width: 12px;
+            height: 60px;
+            border: 1px solid rgba(220,220,220,.68);
+            border-radius: 999px;
+            background: rgba(0,0,0,.28);
+            cursor: pointer;
+            z-index: 110;
+        }
+        #sidebar.collapsed:hover::after { opacity: 0; }
+        #sidebar.collapsed .sidebar-inner { opacity: 0; transition: opacity .16s ease; }
+        #sidebar.collapsed:hover .sidebar-inner { opacity: 1; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+        }
+
+        .send-arrow {
+            font-size: 21px;
+            line-height: 1;
+            font-weight: 700;
+            transform: translateY(-1px);
+        }
+
+        /* ==============================
+           LANGUAGE
+        ============================== */
+
+        .lang-toggle-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 24px;
+        }
+
+        .lang-btn {
+            font-size: 12px;
+            padding: 4px 14px;
+            border-radius: 14px;
+            color: #8e8e8e;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .lang-btn.active {
+            background: #00ff66;
+            color: #000000;
+            font-weight: 600;
+            border-color: #00ff66;
+        }
+
+        /* ==============================
+           CONVERSATION
+        ============================== */
+
+        #ore-conversation {
+            width: 100%;
+            max-width: 768px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 20px 20px 20px;
+            display: none;
+            flex-direction: column;
+            gap: 24px;
+            margin: 0 auto;
+        }
+
+        .ore-message {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ore-message-user {
+            align-items: flex-end;
+        }
+
+        .ore-message-ore {
+            align-items: flex-start;
+        }
+
+        .ore-message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 4px;
+        }
+
+        .ore-message-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #00ff66;
+        }
+
+        .ore-message-label-user {
+            font-size: 12px;
+            color: #777777;
+            padding: 0 4px;
+        }
+
+        .processing-timer {
+            display: inline-flex;
+            align-items: center;
+            color: #89898d;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .02em;
+            margin-left: 3px;
+            white-space: nowrap;
+        }
+
+        .ore-user-bubble {
+            max-width: 80%;
+            background: #1c1c1e;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 11px 15px;
+            color: #ffffff;
+            font-size: 15px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .ore-response {
+            width: 100%;
+            color: #ececec;
+            font-size: 15px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            padding: 0 4px;
+            user-select: text;
+        }
+
+        .ore-response-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 0 0 0 1px;
+        }
+
+        .response-action {
+            width: 32px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: transparent;
+            color: #858589;
+            cursor: pointer;
+            transition: color .15s ease, background .15s ease;
+        }
+
+        .response-action:hover, .response-action.selected {
+            color: #f0f0f0;
+            background: #242426;
+        }
+
+        .response-action svg { width: 18px; height: 18px; }
+
+        #ask-selection-popup {
+            position: fixed;
+            z-index: 900;
+            display: none;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 11px;
+            color: #101010;
+            background: #f3f3f3;
+            box-shadow: 0 8px 26px rgba(0,0,0,.42);
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        #ask-selection-popup.visible { display: inline-flex; }
+        #ask-selection-popup:hover { background: #fff; transform: translateY(-1px); }
+
+        /* ==============================
+           DIAMOND
+           DO NOT TOUCH THE GEM
+        ============================== */
+
+        .ore-diamond-gem {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 0 6px rgba(0, 255, 102, 0.7));
+            animation: oreGemPulse 1.2s ease-in-out infinite;
+        }
+
+        .ore-diamond-gem svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ==============================
+           THINKING
+        ============================== */
+
+        .ore-thinking-area {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 2px 4px;
+            flex-wrap: wrap;
+        }
+
+        .ore-thinking-text {
+            color: #8e8e8e;
+            font-size: 14px;
+            font-style: normal;
+        }
+
+        .ore-star-frame {
+            position: relative;
+            width: 30px;
+            height: 26px;
+            flex: 0 0 30px;
+            margin-left: 2px;
+            filter: drop-shadow(0 0 5px rgba(0,255,102,.28));
+        }
+
+        .ore-twinkle-star {
+            position: absolute;
+            z-index: 1;
+            color: #68ff9c;
+            font-size: 8px;
+            line-height: 1;
+            text-shadow: 0 0 7px rgba(0,255,102,.95);
+            animation: oreStarTwinkle 1.25s ease-in-out infinite;
+        }
+
+        .ore-twinkle-star:nth-child(1) { top: 1px; left: 1px; animation: oreStarOrbitOne 2.2s ease-in-out infinite; }
+        .ore-twinkle-star:nth-child(2) { top: 1px; right: 2px; animation: oreStarOrbitTwo 2.6s ease-in-out infinite; }
+        .ore-twinkle-star:nth-child(3) { right: 2px; bottom: 1px; animation: oreStarOrbitThree 2.35s ease-in-out infinite; }
+        .ore-twinkle-star:nth-child(4) { left: 1px; bottom: 1px; animation: oreStarOrbitFour 2.8s ease-in-out infinite; }
+
+        @keyframes oreStarOrbitOne {
+            0%, 100% { opacity: .42; transform: translate(0,0) rotate(0) scale(.7); }
+            25% { opacity: 1; transform: translate(5px,-4px) rotate(100deg) scale(1.25); }
+            50% { opacity: .75; transform: translate(9px,1px) rotate(220deg) scale(.9); }
+            75% { opacity: 1; transform: translate(4px,5px) rotate(320deg) scale(1.15); }
+        }
+        @keyframes oreStarOrbitTwo {
+            0%, 100% { opacity: .4; transform: translate(0,0) rotate(0) scale(.75); }
+            25% { opacity: 1; transform: translate(-4px,5px) rotate(-100deg) scale(1.2); }
+            50% { opacity: .72; transform: translate(-9px,2px) rotate(-220deg) scale(.88); }
+            75% { opacity: 1; transform: translate(-4px,-4px) rotate(-320deg) scale(1.18); }
+        }
+        @keyframes oreStarOrbitThree {
+            0%, 100% { opacity: .38; transform: translate(0,0) rotate(0) scale(.72); }
+            25% { opacity: 1; transform: translate(-5px,4px) rotate(110deg) scale(1.22); }
+            50% { opacity: .7; transform: translate(-8px,-2px) rotate(230deg) scale(.9); }
+            75% { opacity: 1; transform: translate(-3px,-5px) rotate(330deg) scale(1.2); }
+        }
+        @keyframes oreStarOrbitFour {
+            0%, 100% { opacity: .4; transform: translate(0,0) rotate(0) scale(.75); }
+            25% { opacity: 1; transform: translate(4px,-5px) rotate(-110deg) scale(1.2); }
+            50% { opacity: .72; transform: translate(8px,2px) rotate(-230deg) scale(.88); }
+            75% { opacity: 1; transform: translate(3px,5px) rotate(-330deg) scale(1.18); }
+        }
+
+        @keyframes oreStarTwinkle {
+            0%, 100% { opacity: .35; transform: scale(.72) rotate(0deg); }
+            50% { opacity: 1; transform: scale(1.22) rotate(45deg); }
+        }
+
+        /* ==============================
+           RESPONSE GLOW
+        ============================== */
+
+        .ore-message-ore.generating {
+            animation: oreResponseGlow 1.8s ease-in-out infinite;
+        }
+
+        @keyframes oreResponseGlow {
+
+            0%,
+            100% {
+                filter: drop-shadow(0 0 0 rgba(0,255,102,0));
+            }
+
+            50% {
+                filter: drop-shadow(0 0 8px rgba(0,255,102,0.08));
+            }
+        }
+
+        @keyframes oreGemPulse {
+
+            0%,
+            100% {
+                transform: scale(0.92);
+                filter: drop-shadow(0 0 4px rgba(0, 255, 102, 0.5));
+                opacity: 0.7;
+            }
+
+            50% {
+                transform: scale(1.12);
+                filter: drop-shadow(0 0 10px rgba(0, 255, 102, 0.9));
+                opacity: 1;
+            }
+        }
+
+        @keyframes oreDotPulse {
+
+            0%,
+            100% {
+                opacity: 0.25;
+                transform: translateY(0);
+            }
+
+            50% {
+                opacity: 1;
+                transform: translateY(-2px);
+            }
+        }
+
+        .ore-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 17px;
+            margin-left: 3px;
+            vertical-align: -3px;
+            background: #00ff66;
+            animation: oreCursorBlink 0.8s step-end infinite;
+        }
+
+        @keyframes oreCursorBlink {
+
+            0%,
+            45% {
+                opacity: 1;
+            }
+
+            46%,
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* ==============================
+           ACTIVE CHAT
+        ============================== */
+
+        body.chat-active .hero-title {
+            display: none;
+        }
+
+        body.chat-active .hero-subtitle { display: none; }
+
+        #sidebar.collapsed:hover + #main #open-sidebar-btn { display: none !important; }
+
+        body.chat-active .lang-toggle-bar {
+            margin-top: 12px;
+        }
+
+        body.chat-active .center-container {
+            flex: none;
+            padding-bottom: 20px;
+            justify-content: flex-end;
+        }
+
+        body.chat-active .pixel-chat-bar {
+            margin-top: 0;
+        }
+
+        /* ==============================
+           TOAST
+        ============================== */
+
+        #ore-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(15px);
+            background: #1c1c1e;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #eeeeee;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition:
+                opacity 0.2s ease,
+                transform 0.2s ease;
+            z-index: 500;
+        }
+
+        #ore-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ==============================
+           MOBILE
+        ============================== */
+
+        @media (min-width: 701px) and (max-width: 1024px) {
+            #sidebar, .sidebar-inner { width: 232px; }
+            #sidebar.collapsed { margin-left: -232px; }
+            .center-container { padding-left: 16px; padding-right: 16px; }
+            .pixel-chat-bar { padding: 12px 14px; }
+            .toolbar-left, .toolbar-right { gap: 7px; }
+            .pixel-pill-btn { padding-left: 10px; padding-right: 10px; }
+            .model-btn { padding-left: 10px; padding-right: 8px; }
+        }
+
+        @media (max-width: 700px) {
+
+            #sidebar {
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 200;
+                box-shadow: 15px 0 40px rgba(0,0,0,0.5);
+            }
+
+            #sidebar.collapsed {
+                margin-left: -260px;
+            }
+
+            .top-right-offer {
+                right: 10px;
+            }
+
+            .center-container {
+                padding: 0 12px max(12px, env(safe-area-inset-bottom));
+            }
+
+            .hero-title {
+                font-size: 25px;
+            }
+
+            .toolbar-right {
+                flex: 1 1 auto;
+                gap: 6px;
+            }
+
+            .pixel-toolbar { align-items: flex-end; }
+            .toolbar-left .pixel-icon-btn { width: 40px; height: 40px; }
+            .nav-item, .chat-history-item { min-height: 44px; }
+
+            .pixel-pill-btn {
+                padding: 0 9px;
+            }
+
+            .model-btn {
+                padding: 0 8px 0 10px;
+            }
+
+            .pixel-pill-btn, .model-btn, .send-btn { min-height: 40px; }
+
+            #ore-conversation {
+                padding: 16px 30px 16px 12px;
+            }
+
+            .ore-user-bubble {
+                max-width: 90%;
+            }
+
+        }
+
+        @media (max-width: 480px) {
+            .top-nav-bar { height: 52px; padding: 0 8px; }
+            .mode-pill { padding: 2px; }
+            .pill-btn { padding: 7px 12px; font-size: 12px; }
+            .top-right-offer { right: 8px; }
+            .top-right-offer .icon-btn { width: 36px; height: 36px; }
+            .hero-title { max-width: 100%; font-size: clamp(21px, 6vw, 25px); text-align: center; }
+            .hero-subtitle { max-width: 34ch; font-size: 13px; line-height: 1.5; }
+            .pixel-chat-bar { padding: 9px 10px; border-radius: 24px; gap: 8px; }
+            .chat-input { font-size: 16px; min-height: 30px; }
+            .toolbar-left .pixel-icon-btn { width: 38px; height: 38px; }
+            .toolbar-right { gap: 5px; }
+            .toolbar-label { display: none; }
+            .pixel-pill-btn { height: 38px; padding: 0 9px; font-size: 12px; }
+            .model-btn { height: 38px; max-width: 132px; font-size: 11px; gap: 3px; }
+            #model-btn-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+            .send-btn { width: 38px; height: 38px; }
+            .lang-toggle-bar { margin-top: 12px; }
+            .lang-btn { min-height: 40px; padding: 0 16px; }
+            .ore-user-bubble { max-width: 94%; }
+            .ore-response-actions { gap: 2px; }
+            .response-action { width: 38px; height: 38px; }
+            .model-menu { width: min(320px, calc(100vw - 16px)); min-width: 0; }
+        }
+
+        @media (max-width: 360px) {
+            .center-container { padding-left: 8px; padding-right: 8px; }
+            .pixel-chat-bar { padding-left: 8px; padding-right: 8px; }
+            .toolbar-left .pixel-icon-btn { width: 36px; height: 36px; }
+            .toolbar-right { gap: 4px; }
+            .pixel-pill-btn { padding: 0 7px; }
+            .model-btn { max-width: 116px; padding-left: 7px; padding-right: 6px; }
+            .model-btn .model-chevron { width: 13px; }
+            .send-btn { width: 36px; height: 36px; }
+            #ore-conversation { padding-left: 8px; padding-right: 26px; }
+        }
+
+        @media (max-height: 520px) and (max-width: 900px) {
+            .top-nav-bar { height: 44px; }
+            body.chat-active .center-container { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+            body.chat-active .lang-toggle-bar { margin-top: 4px; }
+            #ore-conversation { padding-top: 8px; padding-bottom: 8px; }
+            .pixel-chat-bar { gap: 5px; }
+            .chat-input { max-height: 100px; }
+        }
+
+        #chat-jump-rail {
+            position: fixed;
+            z-index: 160;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+            max-height: 52vh;
+            overflow-y: auto;
+            padding: 10px 7px;
+            border: 1px solid rgba(255,255,255,.07);
+            border-radius: 18px;
+            background: rgba(20,20,20,.78);
+            backdrop-filter: blur(10px);
+        }
+
+        #chat-jump-rail.visible { display: flex; }
+        .chat-jump-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 8px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: #68686b;
+            cursor: pointer;
+            transition: transform .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+        .chat-jump-dot:hover, .chat-jump-dot.active {
+            background: #00ff66;
+            transform: scale(1.35);
+            box-shadow: 0 0 9px rgba(0,255,102,.55);
+        }
+        @media (max-width: 700px) { #chat-jump-rail { right: 3px; gap: 7px; padding: 8px 5px; } }
+
+    </style>
+</head>
+
+<body>
+
+<section class="auth-screen" id="auth-screen" aria-labelledby="auth-heading">
+    <div class="auth-card">
+        <div class="auth-brand" aria-label="Ore">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="8,3 16,3 14,8 10,8" fill="#ccffdd"/><polygon points="6,3 8,3 10,8 2,9" fill="#52ff94"/><polygon points="16,3 18,3 22,9 14,8" fill="#00e65c"/><polygon points="10,8 14,8 12,21" fill="#00ff66"/><polygon points="2,9 10,8 12,21" fill="#00b347"/><polygon points="22,9 14,8 12,21" fill="#008033"/></svg>
+            <span>Ore</span>
+        </div>
+        <h1 class="auth-heading" id="auth-heading">Welcome to Ore</h1>
+        <p class="auth-description">Sign in to continue to your personal workspace.</p>
+        <div class="auth-options" id="auth-options">
+            <button class="auth-option" id="google-sign-in" type="button">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.9 6.1-15Z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z"/><path fill="#FBBC05" d="M12.6 27.7a12 12 0 0 1 0-7.4V15H5.8a20 20 0 0 0 0 17.9l6.8-5.2Z"/><path fill="#EA4335" d="M24 11.9c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 5.9 29.5 4 24 4A20 20 0 0 0 5.8 15l6.8 5.3c1.6-4.8 6.1-8.4 11.4-8.4Z"/></svg>
+                Continue with Google
+            </button>
+            <button class="auth-option apple" id="apple-sign-in" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.7 12.8c0-2.4 2-3.5 2.1-3.6a4.6 4.6 0 0 0-3.6-1.9c-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.9a4.9 4.9 0 0 0-4.1 2.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.5 3.2 2.4 1.3-.1 1.8-.8 3.4-.8s2.1.8 3.4.8 2.2-1.2 3.1-2.5a11 11 0 0 0 1.4-2.9 4.3 4.3 0 0 1-3.1-4.2ZM14.2 5.7A4.4 4.4 0 0 0 15.2 2a4.5 4.5 0 0 0-3 1.5 4.1 4.1 0 0 0-1 3.5 3.8 3.8 0 0 0 3-1.3Z"/></svg>
+                Continue with Apple
+            </button>
+            <div class="auth-divider">OR</div>
+            <button class="auth-option email" id="email-sign-in" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                Continue with email
+            </button>
+        </div>
+        <form class="auth-email-form" id="auth-email-form">
+            <input class="auth-email-input" id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email address" required>
+            <input class="auth-email-input" id="auth-password" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" minlength="6" required>
+            <button class="auth-option auth-email-submit" id="auth-email-submit" type="submit">Sign in</button>
+            <button class="auth-account-switch" id="auth-account-switch" type="button">Create an account</button>
+            <button class="auth-back" id="auth-back" type="button">Back to sign-in options</button>
+        </form>
+        <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
+        <p class="auth-legal">Sign in securely with one of the options above.</p>
+    </div>
+</section>
+
+<div id="app">
+
+    <!-- ==============================
+         SIDEBAR
+    ============================== -->
+
+    <aside id="sidebar">
+
+        <div class="sidebar-inner">
+
+            <div class="sidebar-header">
+
+                <div class="brand-title">
+
+                    <!-- ORIGINAL EMERALD DIAMOND -->
+                    <svg viewBox="0 0 24 24" class="w-5 h-5">
+                        <polygon points="8,3 16,3 14,8 10,8" fill="#ccffdd"/>
+                        <polygon points="6,3 8,3 10,8 2,9" fill="#52ff94"/>
+                        <polygon points="16,3 18,3 22,9 14,8" fill="#00e65c"/>
+                        <polygon points="10,8 14,8 12,21" fill="#00ff66"/>
+                        <polygon points="2,9 10,8 12,21" fill="#00b347"/>
+                        <polygon points="22,9 14,8 12,21" fill="#008033"/>
+                    </svg>
+
+                    Ore
+
+                </div>
+
+                <div class="flex items-center gap-1">
+
+                    <button class="icon-btn" title="Search chats">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.3-4.3"/>
+                        </svg>
+                    </button>
+
+                    <button class="icon-btn" id="close-sidebar-btn" title="Close sidebar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="18" x="3" y="3" rx="2"/>
+                            <path d="M9 3v18"/>
+                        </svg>
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="nav-section">
+
+                <div class="nav-item" id="new-chat-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    New chat
+                </div>
+
+                <div class="nav-item justify-between">
+
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                            <circle cx="9" cy="9" r="2"/>
+                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                        </svg>
+                        Images
+                    </div>
+
+                    <span class="badge-updated">UPDATED</span>
+
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m16 6 4 14M12 6v14M8 6l-4 14M12 2v4"/>
+                    </svg>
+                    Library
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Scheduled
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l5.58-5.58c.94-.94 0-2.48 0-3.42L12 2Z"/>
+                        <circle cx="7" cy="7" r="1.5"/>
+                    </svg>
+                    Plugins
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L8.6 3.3A2 2 0 0 0 6.9 2.5H4a2 2 0 0 0-2 2v13.5a2 2 0 0 0 2 2h16z"/>
+                    </svg>
+                    Projects
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    Codex
+                </div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"/>
+                        <circle cx="19" cy="12" r="1"/>
+                        <circle cx="5" cy="12" r="1"/>
+                    </svg>
+                    More
+                </div>
+
+                <div class="section-divider">Pinned</div>
+
+                <div class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Assignment Help
+                </div>
+
+                <div class="section-divider">
+                    <span>Recents</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m6 9 6 6 6-6"/>
+                    </svg>
+                </div>
+
+                <div id="chat-history">
+                    <div class="chat-empty">No recent chats</div>
+                </div>
+
+            </div>
+
+            <div class="sidebar-bottom">
+
+                <button class="claim-offer-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="8" width="18" height="12" rx="2"/>
+                        <path d="M12 5v3M7 8s0-3 2.5-3c2 0 2.5 3 2.5 3M17 8s0-3-2.5-3c-2 0-2.5 3-2.5 3"/>
+                    </svg>
+                    Claim offer
+                </button>
+
+                <button class="user-profile" id="sign-out-btn" type="button" title="Sign out">
+
+                    <div class="user-avatar" id="user-avatar">M</div>
+
+                    <div class="user-info">
+                        <span class="user-name" id="user-name">Murphy</span>
+                        <span class="user-plan" id="user-plan">Free</span>
+                    </div>
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+    <!-- ==============================
+         MAIN WORKSPACE
+    ============================== -->
+
+    <main id="main">
+
+        <button id="open-sidebar-btn" class="icon-btn" title="Open sidebar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="18" height="18" x="3" y="3" rx="2"/>
+                <path d="M9 3v18"/>
+            </svg>
+        </button>
+
+        <!-- TOP NAV -->
+
+        <div class="top-nav-bar">
+
+            <div class="mode-pill">
+
+                <button class="pill-btn active" id="chat-mode-btn">
+                    Chat
+                </button>
+
+                <button class="pill-btn flex items-center gap-1" id="work-mode-btn">
+                    <span style="color:#00ff66;">✦</span>
+                    Work
+                </button>
+
+            </div>
+
+            <div class="top-right-offer">
+
+                <button class="icon-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                    </svg>
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- ==============================
+             ORE CONVERSATION
+        ============================== -->
+
+        <div id="ore-conversation"></div>
+
+        <!-- ==============================
+             CENTER
+        ============================== -->
+
+        <div class="center-container">
+
+            <h1 class="hero-title" id="hero-title">How can I help, Murphy?</h1>
+            <p class="hero-subtitle" id="hero-subtitle">A fresh start, a clear mind. What shall we make progress on?</p>
+
+            <div class="pixel-chat-bar">
+
+                <textarea
+                    class="chat-input"
+                    id="chat-input"
+                    placeholder="Ask anything"
+                    rows="1"
+                    autocomplete="off"
+                ></textarea>
+
+                <div class="pixel-toolbar">
+
+                    <div class="toolbar-left">
+
+                        <div class="attachment-wrap">
+                        <button class="pixel-icon-btn" id="attachment-btn" title="Add attachment" type="button" aria-haspopup="menu" aria-expanded="false">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                        </button>
+                        <div class="attachment-menu" id="attachment-menu" role="menu" aria-label="More ways to use Ore">
+                            <div class="attachment-menu-title">Explore Ore</div>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">▧</span><span class="attachment-option-copy"><span class="attachment-option-name">Add photos &amp; files</span><span class="attachment-option-hint">Bring your work into the chat</span></span><span class="coming-soon">Coming soon</span></button>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">✦</span><span class="attachment-option-copy"><span class="attachment-option-name">Create an image</span><span class="attachment-option-hint">Turn an idea into a visual</span></span><span class="coming-soon">Coming soon</span></button>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">⌕</span><span class="attachment-option-copy"><span class="attachment-option-name">Research</span><span class="attachment-option-hint">Explore a topic in depth</span></span><span class="coming-soon">Coming soon</span></button>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">▤</span><span class="attachment-option-copy"><span class="attachment-option-name">Study &amp; learn</span><span class="attachment-option-hint">Work through a subject together</span></span><span class="coming-soon">Coming soon</span></button>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">⌘</span><span class="attachment-option-copy"><span class="attachment-option-name">Code</span><span class="attachment-option-hint">Build, debug, and understand</span></span><span class="coming-soon">Coming soon</span></button>
+                            <button class="attachment-option" type="button" role="menuitem"><span class="attachment-option-icon">◷</span><span class="attachment-option-copy"><span class="attachment-option-name">Plan a task</span><span class="attachment-option-hint">Break a goal into next steps</span></span><span class="coming-soon">Coming soon</span></button>
+                        </div></div>
+
+                    </div>
+
+                    <div class="toolbar-right">
+
+                        <button
+                            class="pixel-pill-btn"
+                            id="search-web-btn"
+                            type="button"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="m21 21-4.3-4.3"/>
+                            </svg>
+
+                            <span style="color:#00ff66;">✦</span>
+
+                            <span class="toolbar-label">Search</span>
+                        </button>
+
+                        <button class="pixel-pill-btn" id="think-btn" type="button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04Z"/>
+                                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04Z"/>
+                            </svg>
+
+                            <span class="toolbar-label">Think</span>
+                        </button>
+
+                        <!-- ==============================
+                             MODEL SELECTOR (Luna)
+                        ============================== -->
+
+                        <div class="model-selector">
+
+                            <button
+                                class="model-btn"
+                                id="model-btn"
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded="false"
+                                title="Choose model"
+                            >
+                                <span id="model-btn-label">Luna 1.4 · Medium</span>
+
+                                <svg class="model-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m6 15 6-6 6 6"/>
+                                </svg>
+                            </button>
+
+                            <div class="model-menu" id="model-menu" role="menu"></div>
+
+                        </div>
+
+                        <!-- ACTUAL SEND BUTTON -->
+
+                        <button class="send-btn" id="send-btn" title="Send message" type="button">
+                            <span class="send-arrow">↑</span>
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- LANGUAGE -->
+
+            <div class="lang-toggle-bar">
+
+                <button class="lang-btn active" id="lang-pidgin" type="button">
+                    Pidgin
+                </button>
+
+                <button class="lang-btn" id="lang-english" type="button">
+                    English
+                </button>
+
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+<div id="ore-toast"></div>
+<nav id="chat-jump-rail" aria-label="Jump to a message"></nav>
+<button id="ask-selection-popup" type="button" aria-label="Ask Ore about selected text"><span aria-hidden="true">✦</span> Ask Ore</button>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+    import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-analytics.js";
+    import {
+        getAuth,
+        setPersistence,
+        browserLocalPersistence,
+        onAuthStateChanged,
+        GoogleAuthProvider,
+        OAuthProvider,
+        signInWithPopup,
+        signInWithRedirect,
+        getRedirectResult,
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        signOut
+    } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+
+    /* =========================================================
+       BASIC UI
+    ========================================================= */
+
+    const sidebar =
+        document.getElementById("sidebar");
+
+    const closeSidebarBtn =
+        document.getElementById("close-sidebar-btn");
+
+    const openSidebarBtn =
+        document.getElementById("open-sidebar-btn");
+
+    const authScreen = document.getElementById("auth-screen");
+    const authOptions = document.getElementById("auth-options");
+    const authEmailForm = document.getElementById("auth-email-form");
+    const authEmailInput = document.getElementById("auth-email");
+    const authPasswordInput = document.getElementById("auth-password");
+    const authEmailSubmit = document.getElementById("auth-email-submit");
+    const authAccountSwitch = document.getElementById("auth-account-switch");
+    const authStatus = document.getElementById("auth-status");
+    let authMode = "signin";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCfEq46hpBsKgNsS8kWRs3MXaKwJS9oux8",
+        authDomain: "ore-luna.firebaseapp.com",
+        projectId: "ore-luna",
+        storageBucket: "ore-luna.firebasestorage.app",
+        messagingSenderId: "1010848981535",
+        appId: "1:1010848981535:web:f4d42e208e635786bceb2a",
+        measurementId: "G-5PCWYP6WQ2"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const firebaseAuth = getAuth(firebaseApp);
+    firebaseAuth.useDeviceLanguage();
+    const persistenceReady = setPersistence(firebaseAuth, browserLocalPersistence);
+    persistenceReady.catch(error => {
+        console.error("Could not save sign-in session:", error);
+    });
+
+    isSupported()
+        .then(supported => { if (supported) getAnalytics(firebaseApp); })
+        .catch(() => {});
+
+    function setAuthStatus(message) {
+        authStatus.textContent = message;
+    }
+
+    function friendlyAuthError(error) {
+        const messages = {
+            "auth/operation-not-allowed": "This sign-in option is not enabled yet. Please contact Ore support.",
+            "auth/popup-closed-by-user": "Sign-in was cancelled. You can try again whenever you're ready.",
+            "auth/cancelled-popup-request": "A sign-in window is already open. Please finish that step first.",
+            "auth/popup-blocked": "Your browser blocked the sign-in window. Allow pop-ups and try again.",
+            "auth/unauthorized-domain": "This website is not yet approved for sign-in. Please contact Ore support.",
+            "auth/invalid-email": "Enter a valid email address and try again.",
+            "auth/invalid-credential": "That email or password doesn't match. Check it and try again.",
+            "auth/email-already-in-use": "An account already uses this email. Try signing in instead.",
+            "auth/weak-password": "Choose a password with at least 6 characters.",
+            "auth/network-request-failed": "We couldn't connect. Check your internet connection and try again.",
+            "auth/account-exists-with-different-credential": "An account already exists for this email. Try its original sign-in method."
+        };
+        return messages[error && error.code] || "Sign-in couldn't be completed. Please try again.";
+    }
+
+    async function runOAuthSignIn(providerName) {
+        setAuthStatus("Opening secure sign-in…");
+        try {
+            await persistenceReady;
+            const provider = providerName === "google"
+                ? new GoogleAuthProvider()
+                : new OAuthProvider("apple.com");
+            if (providerName === "apple") {
+                provider.addScope("email");
+                provider.addScope("name");
+            }
+
+            const isMobile = window.matchMedia("(max-width: 700px)").matches || /iPhone|iPad|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                await signInWithRedirect(firebaseAuth, provider);
+                return;
+            }
+            await signInWithPopup(firebaseAuth, provider);
+        } catch (error) {
+            console.error("Firebase sign-in failed:", error);
+            setAuthStatus(friendlyAuthError(error));
+        }
+    }
+
+    document.getElementById("google-sign-in").addEventListener("click", () => runOAuthSignIn("google"));
+    document.getElementById("apple-sign-in").addEventListener("click", () => runOAuthSignIn("apple"));
+    document.getElementById("sign-out-btn").addEventListener("click", async () => {
+        try {
+            await signOut(firebaseAuth);
+        } catch (error) {
+            console.error("Sign-out failed:", error);
+            showToast("Couldn't sign out. Please try again.");
+        }
+    });
+    document.getElementById("email-sign-in").addEventListener("click", () => {
+        authOptions.style.display = "none";
+        authEmailForm.classList.add("visible");
+        authMode = "signin";
+        authPasswordInput.autocomplete = "current-password";
+        authEmailSubmit.textContent = "Sign in";
+        authAccountSwitch.textContent = "Create an account";
+        setAuthStatus("");
+        authEmailInput.focus();
+    });
+    document.getElementById("auth-back").addEventListener("click", () => {
+        authEmailForm.classList.remove("visible");
+        authOptions.style.display = "grid";
+        setAuthStatus("");
+    });
+    authAccountSwitch.addEventListener("click", () => {
+        authMode = authMode === "signin" ? "signup" : "signin";
+        const creatingAccount = authMode === "signup";
+        authPasswordInput.autocomplete = creatingAccount ? "new-password" : "current-password";
+        authEmailSubmit.textContent = creatingAccount ? "Create account" : "Sign in";
+        authAccountSwitch.textContent = creatingAccount ? "Already have an account? Sign in" : "Create an account";
+        setAuthStatus("");
+    });
+    authEmailForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (!authEmailInput.reportValidity() || !authPasswordInput.reportValidity()) return;
+        setAuthStatus(authMode === "signup" ? "Creating your account…" : "Signing you in…");
+        const authenticate = authMode === "signup" ? createUserWithEmailAndPassword : signInWithEmailAndPassword;
+        try {
+            await persistenceReady;
+            await authenticate(firebaseAuth, authEmailInput.value.trim(), authPasswordInput.value);
+            authEmailForm.reset();
+        } catch (error) {
+            console.error("Email sign-in failed:", error);
+            setAuthStatus(friendlyAuthError(error));
+        }
+    });
+
+    getRedirectResult(firebaseAuth).catch(error => {
+        console.error("Firebase redirect sign-in failed:", error);
+        setAuthStatus(friendlyAuthError(error));
+    });
+
+    let autoCollapsedForMobile = false;
+    function syncSidebarForViewport() {
+        if (window.matchMedia("(max-width: 700px)").matches) {
+            if (!sidebar.classList.contains("collapsed")) {
+                sidebar.classList.add("collapsed");
+                openSidebarBtn.style.display = "flex";
+                autoCollapsedForMobile = true;
+            }
+        } else if (autoCollapsedForMobile) {
+            sidebar.classList.remove("collapsed");
+            openSidebarBtn.style.display = "none";
+            autoCollapsedForMobile = false;
+        }
+    }
+    syncSidebarForViewport();
+    window.addEventListener("resize", syncSidebarForViewport, { passive: true });
+
+    const chatModeBtn =
+        document.getElementById("chat-mode-btn");
+
+    const workModeBtn =
+        document.getElementById("work-mode-btn");
+
+    const thinkBtn =
+        document.getElementById("think-btn");
+
+    const chatInput =
+        document.getElementById("chat-input");
+
+    onAuthStateChanged(firebaseAuth, user => {
+        authScreen.hidden = Boolean(user);
+        document.body.classList.toggle("authenticated", Boolean(user));
+        if (user) {
+            authEmailForm.reset();
+            const displayName = user.displayName || (user.email ? user.email.split("@")[0] : "Ore user");
+            document.getElementById("user-name").textContent = displayName;
+            document.getElementById("user-plan").textContent = user.email || "Signed in";
+            document.getElementById("user-avatar").textContent = displayName.slice(0, 1).toUpperCase();
+            chatInput.focus();
+        } else {
+            document.getElementById("user-name").textContent = "Murphy";
+            document.getElementById("user-plan").textContent = "Free";
+            document.getElementById("user-avatar").textContent = "M";
+        }
+    });
+
+    const sendBtn =
+        document.getElementById("send-btn");
+
+    const attachmentBtn = document.getElementById("attachment-btn");
+    const attachmentMenu = document.getElementById("attachment-menu");
+    const heroTitle = document.getElementById("hero-title");
+    const heroSubtitle = document.getElementById("hero-subtitle");
+    let activeController = null;
+    let responseRun = 0;
+    let userStopped = false;
+    let processingTimerInterval = null;
+    let processingTimerElement = null;
+    let processingTimerStartedAt = 0;
+
+    function formatElapsedTime(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return hours > 0
+            ? `${hours}h ${String(minutes).padStart(2, "0")}m`
+            : minutes > 0 ? `${minutes}m ${String(seconds).padStart(2, "0")}s` : `${seconds}s`;
+    }
+
+    function getTimeOfDay(hour) {
+        if (hour >= 5 && hour < 7) return "dawn";
+        if (hour >= 7 && hour < 12) return "morning";
+        if (hour >= 12 && hour < 17) return "afternoon";
+        if (hour >= 17 && hour < 21) return "evening";
+        return "night";
+    }
+
+    function getLocalTimeContext() {
+        const now = new Date();
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+        const localDateTime = new Intl.DateTimeFormat("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "long"
+        }).format(now);
+
+        return {
+            iso: now.toISOString(),
+            localDateTime,
+            timeZone,
+            timeOfDay: getTimeOfDay(now.getHours())
+        };
+    }
+
+    function startProcessingTimer(thinkingMessage) {
+        finishProcessingTimer();
+        if (!thinkingMessage) return;
+
+        const timer = document.createElement("span");
+        timer.className = "processing-timer running";
+        timer.setAttribute("role", "timer");
+        timer.setAttribute("aria-label", "Elapsed response time");
+        timer.textContent = "00:00";
+        const activityLine = thinkingMessage.querySelector(".ore-thinking-area") || thinkingMessage;
+        activityLine.appendChild(timer);
+
+        processingTimerElement = timer;
+        processingTimerStartedAt = Date.now();
+        const update = () => {
+            if (processingTimerElement) {
+                const elapsed = Math.floor((Date.now() - processingTimerStartedAt) / 1000);
+                processingTimerElement.textContent = formatElapsedTime(elapsed);
+            }
+        };
+        update();
+        processingTimerInterval = setInterval(update, 1000);
+    }
+
+    function finishProcessingTimer() {
+        if (processingTimerInterval) clearInterval(processingTimerInterval);
+        processingTimerInterval = null;
+        if (processingTimerElement) processingTimerElement.remove();
+        processingTimerElement = null;
+        processingTimerStartedAt = 0;
+    }
+
+    const greetings = [
+        ["Good morning, Murphy.", "A new day, a fresh page. What would you like to work on?"],
+        ["Good afternoon, Murphy.", "Let’s make a little progress on something that matters."],
+        ["Good evening, Murphy.", "Take a breath. What can I help you figure out tonight?"],
+        ["Ready when you are, Murphy.", "Bring a question, a plan, or a half-formed idea."],
+        ["What’s on your mind, Murphy?", "We can think it through one step at a time."],
+        ["Let’s make today count.", "What would feel good to get done?"],
+        ["A little progress adds up.", "Choose one thing and we’ll get started."],
+        ["Welcome back, Murphy.", "Pick up where you left off or start somewhere new."],
+        ["Your next idea starts here.", "Tell me what you’re curious about."],
+        ["Need a hand with something?", "I’m here for the big questions and the small ones."],
+        ["Let’s untangle that thought.", "Share whatever you have so far; it needn’t be polished."],
+        ["What are we working on today?", "A plan, a problem, or a brand-new possibility?"],
+        ["Make room for a good idea.", "What would you like to explore?"],
+        ["You bring the spark.", "I’ll help you shape it into a next step."],
+        ["Start wherever you are.", "We can figure out the rest together."],
+        ["One question can open a lot.", "What would you like to know?"],
+        ["Let’s find a clearer path.", "Tell me what feels stuck or uncertain."],
+        ["Small steps, real momentum.", "What’s one thing we can move forward?"],
+        ["Good to see you, Murphy.", "What would you like to make, learn, or solve?"],
+        ["Take your idea for a walk.", "I can help you explore where it might lead."],
+        ["Curiosity looks good on you.", "What have you been wondering about?"],
+        ["Let’s turn a thought into a plan.", "Tell me the goal and we’ll map the way."],
+        ["Here for your next brainstorm.", "What possibilities should we explore?"],
+        ["A fresh start begins with a question.", "What’s yours today?"],
+        ["You don’t have to solve it alone.", "Let’s look at the next step together."],
+        ["What would you like to get clear on?", "We can sort the signal from the noise."],
+        ["Let’s make something useful.", "What are you hoping to create today?"],
+        ["Bring me the messy first draft.", "We’ll shape it into something you feel good about."],
+        ["A new day, new possibilities.", "Which one should we start with?"],
+        ["What’s one thing you’d love to understand?", "Ask away; we can go at your pace."],
+        ["Let’s get your wheels turning.", "What challenge or idea is calling for attention?"],
+        ["You’re right on time for a new idea.", "Where shall we begin?"],
+        ["Make the complicated feel simpler.", "Tell me what you’re working through."],
+        ["Let’s find the interesting angle.", "What topic should we dig into?"],
+        ["Your to-do list called.", "Which task would you like to make easier?"],
+        ["Ready to think out loud?", "Start with a sentence, a question, or a hunch."],
+        ["Let’s build on what you know.", "What are you learning or working toward?"],
+        ["A good question is a great beginning.", "What’s on your list today?"],
+        ["Let’s make space for focus.", "What deserves your attention right now?"],
+        ["You’ve got a thought worth exploring.", "Want to tell me about it?"],
+        ["How can I make today easier?", "Share a task and we’ll find a practical way through."],
+        ["Time for a fresh perspective.", "What would you like to see differently?"],
+        ["Let’s connect a few dots.", "What pieces are you trying to bring together?"],
+        ["What are you hoping to figure out?", "We’ll take it one clear step at a time."],
+        ["Good things start with a first draft.", "Tell me what you want to put into words."],
+        ["Let’s give that idea some shape.", "What do you know so far?"],
+        ["The next step can be a small one.", "What feels manageable to start with?"],
+        ["What would you like to explore today?", "I can help you brainstorm, plan, or learn."],
+        ["Here’s to a little more clarity.", "What’s taking up space in your mind?"],
+        ["Let’s get curious about it.", "What question has been following you around?"],
+        ["Start with the idea that won’t leave you alone.", "We’ll see what we can make of it."],
+        ["What’s the project on your mind?", "Big or small, we can find a good first move."],
+        ["Let’s make your next decision easier.", "Tell me what you’re weighing up."],
+        ["A calm moment to think things through.", "What would you like a second brain for?"],
+        ["Your curiosity has a home here.", "What should we look into?"],
+        ["Let’s make the next hour count.", "What would you like to move forward?"],
+        ["No perfect prompt needed.", "Just tell me what you’re thinking about."],
+        ["What’s something you’d like to make happen?", "We can turn the goal into a few doable steps."],
+        ["You can start with ‘I’m not sure…’", "We’ll work out the question together."],
+        ["Let’s find a way through.", "What’s the challenge in front of you?"],
+        ["Good morning, Murphy. What’s the first small win?", "A little momentum can change the whole day."],
+        ["Good afternoon. Let’s pick up a thread.", "What would you like to make progress on?"],
+        ["Good evening. One last idea to explore?", "I’m here to help you think it through."],
+        ["A thought, a question, a possibility.", "Whatever you have, we can start there."],
+        ["Let’s open a new door.", "What are you ready to learn or try?"],
+        ["Make your next move with a little more confidence.", "Tell me what you’re deciding."],
+        ["What can we make clearer today?", "Bring me the question you keep coming back to."],
+        ["Your next chapter can start small.", "What’s one thing you want to begin?"],
+        ["Let’s turn ‘someday’ into a first step.", "What have you been meaning to do?"],
+        ["Here’s a good place to begin.", "What would you like help with?"],
+        ["Let’s make the tricky bits feel manageable.", "What are you trying to work out?"],
+        ["Ready for a new perspective?", "Share the situation and we’ll look at it together."],
+        ["What’s worth your time today?", "Let’s find a thoughtful way to move it forward."],
+        ["Let’s make something you’re proud of.", "What are we creating together?"],
+        ["One fresh thought can change the picture.", "What would you like to think through?"],
+        ["Welcome to your little thinking space.", "What’s on your mind today?"],
+        ["Let’s turn questions into possibilities.", "Which one should we start with?"],
+        ["What would a helpful answer look like?", "Tell me what you need and we’ll work toward it."],
+        ["You have a starting point, even if it’s tiny.", "Let’s find it together."],
+        ["Let’s make today a bit more intentional.", "What matters most to get done?"],
+        ["What are we curious about?", "Pick a topic and let’s explore it."],
+        ["A new idea is always welcome.", "What’s been on your mind lately?"],
+        ["Let’s give your plans a little momentum.", "What’s the next thing you want to tackle?"],
+        ["Thinking is easier with company.", "What should we untangle together?"],
+        ["Your next good question is waiting.", "What would you like to ask?"],
+        ["Let’s make a little room for possibility.", "What would you like to try?"],
+        ["Bring the goal; we’ll find the route.", "What are you hoping to accomplish?"],
+        ["What deserves a closer look?", "Let’s explore it with care and curiosity."],
+        ["You’re one message from a fresh start.", "What shall we work on?"],
+        ["Let’s find the simplest next step.", "Tell me what you’re aiming for."],
+        ["Make today yours, Murphy.", "What would you like to focus on first?"],
+        ["There’s a way to begin.", "Let’s find it together, one thought at a time."],
+        ["What would be useful right now?", "A quick answer, a thoughtful plan, or a fresh idea?"],
+        ["Let’s get from wondering to understanding.", "What are you curious about today?"],
+        ["A fresh page is waiting.", "What would you like to put on it?"]
+    ];
+
+    const pidginGreetings = [
+        ["Good morning, Murphy.", "Make we start today with one good idea. Wetin you wan work on?"],
+        ["Good afternoon, Murphy.", "Wetin you wan make progress on today? Make we do am small small."],
+        ["Good evening, Murphy.", "Take small break. Wetin I fit help you think through tonight?"],
+        ["Wetin dey your mind, Murphy?", "Talk am as e be; we go reason am together."],
+        ["Wetin we dey work on today?", "Na plan, question, or fresh idea? Make we start."],
+        ["Make we make today count.", "Which one thing go make you feel say you don move forward?"],
+        ["Small progress still be progress.", "Wetin be one thing we fit move forward now?"],
+        ["You don come back, Murphy.", "We fit continue where you stop or start something new."],
+        ["Your next idea fit start here.", "Tell me wetin you dey curious about."],
+        ["You need help with something?", "Big matter or small one, I dey here."],
+        ["Make we arrange that thought.", "Tell me wetin you get so far; e no need perfect."],
+        ["Wetin you wan understand today?", "Ask me anything; we go take am at your pace."],
+        ["Make we find clear way forward.", "Tell me wetin dey confuse you or hold you back."],
+        ["One small step fit start am.", "Wetin be the next thing you wan tackle?"],
+        ["E good to see you, Murphy.", "Wetin you wan create, learn, or solve?"],
+        ["Your curiosity get home here.", "Which thing you wan make we look into?"],
+        ["No need for perfect prompt.", "Just tell me wetin dey your mind."],
+        ["Make we turn idea to plan.", "Tell me wetin you wan achieve; we go map the steps."],
+        ["You no need solve am alone.", "Make we look at the next step together."],
+        ["Wetin go make today easier?", "Share the task; make we find simple way through am."],
+        ["Ready to think am through?", "Start with question, one sentence, or even small hunch."],
+        ["Wetin you dey try figure out?", "We go take am one clear step at a time."],
+        ["Start from where you dey.", "We fit work out the rest together."],
+        ["Make we create something useful.", "Wetin you dey hope to make today?"],
+        ["Bring the rough first draft.", "We go shape am make e work well for you."],
+        ["Your next step fit small.", "Wetin feel easy enough to start with?"],
+        ["Make we reason am together.", "Which challenge or idea need your attention?"],
+        ["You get idea wey worth explore.", "You wan tell me about am?"],
+        ["Time to see am from another side.", "Wetin you wan look at differently?"],
+        ["Make we connect the dots.", "Which things you dey try bring together?"],
+        ["Good things start with first draft.", "Tell me wetin you wan put for words."],
+        ["Wetin you wan explore today?", "I fit help you plan, brainstorm, or learn."],
+        ["Make we find the simple next step.", "Tell me wetin you dey work towards."],
+        ["Your question na good beginning.", "Wetin you wan ask today?"],
+        ["Make we give your idea shape.", "Wetin you know about am so far?"],
+        ["One fresh thought fit change everything.", "Wetin you wan think through?"],
+        ["Make we find way through am.", "Wetin be the challenge wey dey front of you?"],
+        ["Wetin matter pass for you today?", "Make we find thoughtful way to move am forward."],
+        ["Let’s make something you go proud of.", "Wetin we dey create together?"],
+        ["Welcome to your thinking space.", "Wetin dey your mind today?"],
+        ["You fit start with ‘I never sure…’", "We go work out the real question together."],
+        ["Make we make your next choice easier.", "Tell me the options wey you dey consider."],
+        ["Wetin you dey curious about?", "Pick one topic make we explore am."],
+        ["Make we add small momentum to your plan.", "Wetin be the next thing you wan do?"],
+        ["Thinking dey easier with company.", "Wetin we go untangle together?"],
+        ["Wetin you wan make happen?", "We fit turn the goal to small small steps."],
+        ["Make we make the hard part manageable.", "Wetin you dey try work out?"],
+        ["You fit start with small thing.", "Make we find am together."],
+        ["Wetin go help you right now?", "Quick answer, thoughtful plan, or fresh idea?"],
+        ["Make we move from question to understanding.", "Wetin you dey curious about today?"],
+        ["Make today your own, Murphy.", "Wetin you wan focus on first?"]
+    ];
+
+    function showFreshGreeting() {
+        const timeOfDay = getLocalTimeContext().timeOfDay;
+        const choices = selectedLanguage === "pidgin" ? pidginGreetings : greetings;
+        const timelyGreetings = selectedLanguage === "pidgin"
+            ? {
+                dawn: ["Day just dey break, Murphy.", "Make we start this fresh day with one good idea."],
+                morning: ["Good morning, Murphy.", "Make we start today with one good idea. Wetin you wan work on?"],
+                afternoon: ["Good afternoon, Murphy.", "Wetin you wan make progress on today? Make we do am small small."],
+                evening: ["Good evening, Murphy.", "Wetin I fit help you think through this evening?"],
+                night: ["You still dey up, Murphy?", "Tell me wetin dey your mind; we go reason am together."]
+            }
+            : {
+                dawn: ["A new day is just beginning, Murphy.", "What would you like to start with?"],
+                morning: greetings[0],
+                afternoon: greetings[1],
+                evening: greetings[2],
+                night: ["Burning the midnight oil, Murphy?", "What can I help you think through tonight?"]
+            };
+        const greeting = Math.random() < .4
+            ? timelyGreetings[timeOfDay]
+            : choices[Math.floor(Math.random() * choices.length)];
+        heroTitle.textContent = greeting[0];
+        heroSubtitle.textContent = greeting[1];
+    }
+
+    attachmentBtn.addEventListener("click", event => {
+        event.stopPropagation();
+        const open = attachmentMenu.classList.toggle("open");
+        attachmentBtn.setAttribute("aria-expanded", String(open));
+    });
+    document.addEventListener("click", event => {
+        if (!attachmentMenu.contains(event.target) && event.target !== attachmentBtn) {
+            attachmentMenu.classList.remove("open");
+            attachmentBtn.setAttribute("aria-expanded", "false");
+        }
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            attachmentMenu.classList.remove("open");
+            attachmentBtn.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    const centerContainer =
+        document.querySelector(".center-container");
+
+    const mainWorkspace =
+        document.getElementById("main");
+
+    const langPidgin =
+        document.getElementById("lang-pidgin");
+
+    const langEnglish =
+        document.getElementById("lang-english");
+
+    const conversation =
+        document.getElementById("ore-conversation");
+
+    const chatHistory =
+        document.getElementById("chat-history");
+
+    const askSelectionPopup = document.getElementById("ask-selection-popup");
+    let selectedReplyText = "";
+
+    const chatJumpRail = document.getElementById("chat-jump-rail");
+    let chatTurnCount = 0;
+
+    let selectedLanguage = "pidgin";
+
+    showFreshGreeting();
+
+    let isGenerating = false;
+
+    /* =========================================================
+       SIDEBAR
+    ========================================================= */
+
+    closeSidebarBtn.addEventListener(
+        "click",
+        () => {
+
+            sidebar.classList.add(
+                "collapsed"
+            );
+
+            openSidebarBtn.style.display =
+                "flex";
+        }
+    );
+
+    openSidebarBtn.addEventListener(
+        "click",
+        () => {
+
+            sidebar.classList.remove(
+                "collapsed"
+            );
+
+            openSidebarBtn.style.display =
+                "none";
+        }
+    );
+
+    /* =========================================================
+       MODES
+    ========================================================= */
+
+    chatModeBtn.addEventListener(
+        "click",
+        () => {
+
+            chatModeBtn.classList.add(
+                "active"
+            );
+
+            workModeBtn.classList.remove(
+                "active"
+            );
+        }
+    );
+
+    workModeBtn.addEventListener(
+        "click",
+        () => {
+
+            workModeBtn.classList.add(
+                "active"
+            );
+
+            chatModeBtn.classList.remove(
+                "active"
+            );
+        }
+    );
+
+    thinkBtn.addEventListener(
+        "click",
+        () => {
+
+            thinkBtn.classList.toggle(
+                "active"
+            );
+        }
+    );
+
+    /* =========================================================
+       LANGUAGE
+    ========================================================= */
+
+    langPidgin.addEventListener(
+        "click",
+        () => {
+
+            selectedLanguage = "pidgin";
+            showFreshGreeting();
+
+            langPidgin.classList.add(
+                "active"
+            );
+
+            langEnglish.classList.remove(
+                "active"
+            );
+        }
+    );
+
+    langEnglish.addEventListener(
+        "click",
+        () => {
+
+            selectedLanguage = "english";
+            showFreshGreeting();
+
+            langEnglish.classList.add(
+                "active"
+            );
+
+            langPidgin.classList.remove(
+                "active"
+            );
+        }
+    );
+
+    /* =========================================================
+       QUICK PROMPT
+    ========================================================= */
+
+    function quickPrompt(text) {
+
+        chatInput.value = text;
+
+        chatInput.focus();
+
+        chatInput.dispatchEvent(
+            new Event("input")
+        );
+    }
+
+    document.getElementById("search-web-btn").addEventListener("click", () => {
+        quickPrompt("Search the web for ");
+    });
+
+    /* =========================================================
+       TOAST
+    ========================================================= */
+
+    function showToast(message) {
+
+        const toast =
+            document.getElementById(
+                "ore-toast"
+            );
+
+        toast.textContent = message;
+
+        toast.classList.add("show");
+
+        setTimeout(
+            () => {
+                toast.classList.remove(
+                    "show"
+                );
+            },
+            2200
+        );
+    }
+
+    function updateAskSelectionPopup() {
+        const selection = window.getSelection();
+        const text = selection ? selection.toString().trim() : "";
+        const anchor = selection && selection.anchorNode;
+        const anchorElement = anchor && (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement);
+        const response = anchorElement && anchorElement.closest(".ore-response");
+
+        if (!text || !response || !selection.rangeCount) {
+            askSelectionPopup.classList.remove("visible");
+            selectedReplyText = "";
+            return;
+        }
+
+        selectedReplyText = text;
+        const rect = selection.getRangeAt(0).getBoundingClientRect();
+        const popupWidth = 112;
+        const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popupWidth / 2, window.innerWidth - popupWidth - 8));
+        const top = rect.top > 52 ? rect.top - 44 : rect.bottom + 8;
+        askSelectionPopup.style.left = `${left}px`;
+        askSelectionPopup.style.top = `${Math.max(8, Math.min(top, window.innerHeight - 48))}px`;
+        askSelectionPopup.classList.add("visible");
+    }
+
+    document.addEventListener("selectionchange", updateAskSelectionPopup);
+    document.addEventListener("mouseup", () => setTimeout(updateAskSelectionPopup, 0));
+    document.addEventListener("keyup", updateAskSelectionPopup);
+    askSelectionPopup.addEventListener("pointerdown", event => event.preventDefault());
+    askSelectionPopup.addEventListener("click", () => {
+        if (!selectedReplyText) return;
+        const prompt = `Tell me more about this part of your reply:\n\n“${selectedReplyText}”`;
+        askSelectionPopup.classList.remove("visible");
+        window.getSelection()?.removeAllRanges();
+        chatInput.value = "";
+        sendMessage(prompt);
+    });
+
+    /* =========================================================
+       MODEL SELECTOR + THINKING LEVEL
+       Change names / token limits here
+    ========================================================= */
+
+    const LUNA_MODELS = [
+        {
+            id: "luna-1.4",
+            label: "Luna 1.4",
+            description: "18.2M parameter model"
+        },
+        {
+            id: "luna-1.9-pro",
+            label: "1.9 Pro",
+            description: "Advanced reasoning",
+            locked: true
+        },
+        {
+            id: "luna-2",
+            label: "2 Luna",
+            description: "Complex tasks",
+            locked: true
+        }
+    ];
+
+    const THINKING_LEVELS = {
+        low: {
+            label: "Low",
+            description: "Quick and efficient",
+            tokens: 150
+        },
+        medium: {
+            label: "Medium",
+            description: "Balanced depth",
+            tokens: 300
+        },
+        high: {
+            label: "High",
+            description: "Extra thorough",
+            tokens: 500
+        }
+    };
+
+    const CHECK_SVG = `
+        <svg class="menu-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6 9 17l-5-5"/>
+        </svg>
+    `;
+
+    const LOCK_SVG = `
+        <svg class="menu-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="11" width="16" height="10" rx="2"/>
+            <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+        </svg>
+    `;
+
+    const modelBtn =
+        document.getElementById("model-btn");
+
+    const modelBtnLabel =
+        document.getElementById("model-btn-label");
+
+    const modelMenu =
+        document.getElementById("model-menu");
+
+    let selectedModel = LUNA_MODELS[0];
+
+    let selectedThinking = "medium";
+
+    /* remember the last choice (safe if storage is blocked) */
+
+    try {
+
+        const savedModel =
+            localStorage.getItem("ore-model");
+
+        const savedThinking =
+            localStorage.getItem("ore-thinking");
+
+        const foundModel =
+            LUNA_MODELS.find(
+                m => m.id === savedModel
+            );
+
+        if (foundModel && !foundModel.locked) {
+            selectedModel = foundModel;
+        }
+
+        if (
+            savedThinking &&
+            !(THINKING_LEVELS[savedThinking] || {}).locked &&
+            THINKING_LEVELS[savedThinking]
+        ) {
+            selectedThinking = savedThinking;
+        }
+
+    } catch (error) {
+        /* storage unavailable, defaults are fine */
+    }
+
+    function saveModelChoice() {
+
+        try {
+
+            localStorage.setItem(
+                "ore-model",
+                selectedModel.id
+            );
+
+            localStorage.setItem(
+                "ore-thinking",
+                selectedThinking
+            );
+
+        } catch (error) {
+            /* ignore */
+        }
+    }
+
+    function buildModelMenu() {
+
+        let html = "";
+
+        LUNA_MODELS.forEach(model => {
+
+            html += `
+                <button
+                    class="menu-item model-option${model.id === selectedModel.id ? " selected" : ""}${model.locked ? " locked" : ""}"
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked="${model.id === selectedModel.id}"
+                    data-model="${model.id}"
+                >
+                    ${model.locked ? LOCK_SVG : CHECK_SVG}
+                    <span class="menu-text">
+                        <span class="menu-title">${model.label}</span>
+                        <span class="menu-sub">${model.description}</span>
+                    </span>
+                </button>
+            `;
+        });
+
+        html += `<div class="menu-divider"></div>`;
+
+        html += `
+            <button
+                class="menu-item thinking-row"
+                id="thinking-row"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded="false"
+            >
+                <span class="menu-text">
+                    <span class="menu-title">Thinking level</span>
+                </span>
+
+                <svg class="row-arrow" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 5l8 7-8 7z"/>
+                </svg>
+            </button>
+
+            <div class="thinking-flyout" id="thinking-flyout" role="menu">
+        `;
+
+        Object.keys(THINKING_LEVELS).forEach(key => {
+
+            const level =
+                THINKING_LEVELS[key];
+
+            html += `
+                <button
+                    class="menu-item thinking-option${key === selectedThinking ? " selected" : ""}${level.locked ? " locked" : ""}"
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked="${key === selectedThinking}"
+                    data-level="${key}"
+                >
+                    ${CHECK_SVG}
+                    <span class="menu-text">
+                        <span class="menu-title">${level.label}</span>
+                        <span class="menu-sub">${level.locked ? "Locked" : level.description}</span>
+                    </span>
+                </button>
+            `;
+        });
+
+        html += `</div>`;
+
+        modelMenu.innerHTML = html;
+    }
+
+    function updateModelLabel() {
+
+        modelBtnLabel.textContent =
+            `${selectedModel.label} · ${THINKING_LEVELS[selectedThinking].label}`;
+    }
+
+    function positionModelMenu() {
+
+        const btnRect =
+            modelBtn.getBoundingClientRect();
+
+        const menuWidth =
+            modelMenu.offsetWidth;
+
+        const menuHeight =
+            modelMenu.offsetHeight;
+
+        let left =
+            btnRect.right - menuWidth;
+
+        left = Math.max(
+            8,
+            Math.min(
+                left,
+                window.innerWidth - menuWidth - 8
+            )
+        );
+
+        let top =
+            btnRect.top - menuHeight - 10;
+
+        if (top < 8) {
+            top = btnRect.bottom + 10;
+        }
+
+        modelMenu.style.left =
+            left + "px";
+
+        modelMenu.style.top =
+            top + "px";
+    }
+
+    function positionThinkingFlyout() {
+
+        const row =
+            document.getElementById(
+                "thinking-row"
+            );
+
+        const flyout =
+            document.getElementById(
+                "thinking-flyout"
+            );
+
+        if (!row || !flyout) {
+            return;
+        }
+
+        const arrow =
+            row.querySelector(".row-arrow");
+
+        const narrow =
+            window.innerWidth <= 700;
+
+        if (narrow) {
+
+            flyout.classList.add("inline");
+
+            flyout.style.left = "";
+            flyout.style.top = "";
+
+            arrow.classList.add("inline-open");
+
+            return;
+        }
+
+        flyout.classList.remove("inline");
+
+        arrow.classList.remove("inline-open");
+
+        const menuRect =
+            modelMenu.getBoundingClientRect();
+
+        const rowRect =
+            row.getBoundingClientRect();
+
+        const flyoutWidth =
+            flyout.offsetWidth;
+
+        const flyoutHeight =
+            flyout.offsetHeight;
+
+        let left =
+            menuRect.right + 8;
+
+        if (
+            left + flyoutWidth >
+            window.innerWidth - 8
+        ) {
+            left =
+                menuRect.left -
+                flyoutWidth -
+                8;
+        }
+
+        if (left < 8) {
+
+            /* no room on either side: open inline instead */
+
+            flyout.classList.add("inline");
+
+            flyout.style.left = "";
+            flyout.style.top = "";
+
+            arrow.classList.add("inline-open");
+
+            return;
+        }
+
+        let top =
+            rowRect.bottom - flyoutHeight;
+
+        top = Math.max(
+            8,
+            Math.min(
+                top,
+                window.innerHeight -
+                flyoutHeight - 8
+            )
+        );
+
+        flyout.style.left =
+            left + "px";
+
+        flyout.style.top =
+            top + "px";
+    }
+
+    function openThinkingFlyout() {
+
+        const row =
+            document.getElementById(
+                "thinking-row"
+            );
+
+        const flyout =
+            document.getElementById(
+                "thinking-flyout"
+            );
+
+        if (!row || !flyout) {
+            return;
+        }
+
+        flyout.classList.add("show");
+
+        row.classList.add("open");
+
+        row.setAttribute(
+            "aria-expanded",
+            "true"
+        );
+
+        positionThinkingFlyout();
+    }
+
+    function closeThinkingFlyout() {
+
+        const row =
+            document.getElementById(
+                "thinking-row"
+            );
+
+        const flyout =
+            document.getElementById(
+                "thinking-flyout"
+            );
+
+        if (!row || !flyout) {
+            return;
+        }
+
+        flyout.classList.remove("show");
+
+        row.classList.remove("open");
+
+        row.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+    }
+
+    function openModelMenu() {
+
+        buildModelMenu();
+
+        modelMenu.classList.add("show");
+
+        modelBtn.classList.add("open");
+
+        modelBtn.setAttribute(
+            "aria-expanded",
+            "true"
+        );
+
+        positionModelMenu();
+    }
+
+    function closeModelMenu() {
+
+        closeThinkingFlyout();
+
+        modelMenu.classList.remove("show");
+
+        modelBtn.classList.remove("open");
+
+        modelBtn.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+    }
+
+    modelBtn.addEventListener(
+        "click",
+        event => {
+
+            event.stopPropagation();
+
+            if (
+                modelMenu.classList.contains(
+                    "show"
+                )
+            ) {
+                closeModelMenu();
+            } else {
+                openModelMenu();
+            }
+        }
+    );
+
+    modelMenu.addEventListener(
+        "click",
+        event => {
+
+            event.stopPropagation();
+
+            const modelOption =
+                event.target.closest(
+                    ".model-option"
+                );
+
+            const levelOption =
+                event.target.closest(
+                    ".thinking-option"
+                );
+
+            const thinkingRow =
+                event.target.closest(
+                    "#thinking-row"
+                );
+
+            if (modelOption) {
+
+                const found =
+                    LUNA_MODELS.find(
+                        m =>
+                            m.id ===
+                            modelOption.dataset.model
+                    );
+
+                if (found) {
+
+                    if (found.locked) {
+
+                        showToast(
+                            found.label + " is locked"
+                        );
+
+                        return;
+                    }
+
+                    selectedModel = found;
+
+                    updateModelLabel();
+
+                    saveModelChoice();
+
+                    closeModelMenu();
+
+                    showToast(
+                        "Model: " + found.label
+                    );
+                }
+
+                return;
+            }
+
+            if (levelOption) {
+
+                const key =
+                    levelOption.dataset.level;
+
+                if (THINKING_LEVELS[key]) {
+
+                    if (THINKING_LEVELS[key].locked) {
+
+                        showToast(
+                            THINKING_LEVELS[key].label +
+                            " thinking is locked"
+                        );
+
+                        return;
+                    }
+
+                    selectedThinking = key;
+
+                    updateModelLabel();
+
+                    saveModelChoice();
+
+                    closeModelMenu();
+
+                    showToast(
+                        "Thinking level: " +
+                        THINKING_LEVELS[key].label
+                    );
+                }
+
+                return;
+            }
+
+            if (thinkingRow) {
+
+                const flyout =
+                    document.getElementById(
+                        "thinking-flyout"
+                    );
+
+                if (
+                    flyout.classList.contains(
+                        "show"
+                    )
+                ) {
+                    closeThinkingFlyout();
+                } else {
+                    openThinkingFlyout();
+                }
+            }
+        }
+    );
+
+    /* open the flyout on hover too (desktop) */
+
+    modelMenu.addEventListener(
+        "mouseover",
+        event => {
+
+            if (window.innerWidth <= 700) {
+                return;
+            }
+
+            const overRow =
+                event.target.closest(
+                    "#thinking-row"
+                );
+
+            const overFlyout =
+                event.target.closest(
+                    "#thinking-flyout"
+                );
+
+            const overModel =
+                event.target.closest(
+                    ".model-option"
+                );
+
+            if (overRow) {
+                openThinkingFlyout();
+            } else if (
+                overModel &&
+                !overFlyout
+            ) {
+                closeThinkingFlyout();
+            }
+        }
+    );
+
+    document.addEventListener(
+        "click",
+        () => {
+
+            if (
+                modelMenu.classList.contains(
+                    "show"
+                )
+            ) {
+                closeModelMenu();
+            }
+        }
+    );
+
+    document.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Escape" &&
+                modelMenu.classList.contains(
+                    "show"
+                )
+            ) {
+
+                closeModelMenu();
+
+                modelBtn.focus();
+            }
+        }
+    );
+
+    window.addEventListener(
+        "resize",
+        () => {
+
+            if (
+                modelMenu.classList.contains(
+                    "show"
+                )
+            ) {
+
+                positionModelMenu();
+
+                const flyout =
+                    document.getElementById(
+                        "thinking-flyout"
+                    );
+
+                if (
+                    flyout &&
+                    flyout.classList.contains(
+                        "show"
+                    )
+                ) {
+                    positionThinkingFlyout();
+                }
+            }
+        }
+    );
+
+    updateModelLabel();
+
+    /* =========================================================
+       NEW CHAT
+    ========================================================= */
+
+    document
+        .getElementById("new-chat-btn")
+        .addEventListener(
+            "click",
+            () => {
+
+                conversation.innerHTML = "";
+                finishProcessingTimer();
+                chatJumpRail.innerHTML = "";
+                chatJumpRail.classList.remove("visible");
+                chatTurnCount = 0;
+
+                conversation.style.display =
+                    "none";
+
+                document.body.classList.remove(
+                    "chat-active"
+                );
+
+                chatInput.value = "";
+
+                chatInput.style.height =
+                    "auto";
+
+                if (activeController) activeController.abort();
+                userStopped = true;
+                responseRun++;
+                isGenerating = false;
+                sendBtn.classList.remove("is-stop");
+                sendBtn.title = "Send message";
+                sendBtn.setAttribute("aria-label", "Send message");
+                sendBtn.innerHTML = '<span class="send-arrow">↑</span>';
+
+                chatInput.focus();
+
+            }
+        );
+
+    /* =========================================================
+       GEM
+       ORIGINAL GEM PRESERVED
+    ========================================================= */
+
+    function createOreDiamond() {
+
+        const gem =
+            document.createElement("div");
+
+        gem.className =
+            "ore-diamond-gem";
+
+        gem.innerHTML = `
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <polygon
+                    points="8,3 16,3 14,8 10,8"
+                    fill="#ccffdd"
+                />
+
+                <polygon
+                    points="6,3 8,3 10,8 2,9"
+                    fill="#52ff94"
+                />
+
+                <polygon
+                    points="16,3 18,3 22,9 14,8"
+                    fill="#00e65c"
+                />
+
+                <polygon
+                    points="10,8 14,8 12,21"
+                    fill="#00ff66"
+                />
+
+                <polygon
+                    points="2,9 10,8 12,21"
+                    fill="#00b347"
+                />
+
+                <polygon
+                    points="22,9 14,8 12,21"
+                    fill="#008033"
+                />
+            </svg>
+        `;
+
+        return gem;
+    }
+
+    /* =========================================================
+       THINKING INDICATOR
+    ========================================================= */
+
+    function showThinking(message) {
+
+        const oldThinking =
+            document.getElementById(
+                "ore-current-response"
+            );
+
+        if (oldThinking) {
+            oldThinking.remove();
+        }
+
+        const wrapper =
+            document.createElement("div");
+
+        wrapper.className =
+            "ore-message ore-message-ore generating";
+
+        wrapper.id =
+            "ore-current-response";
+
+        const thinkingArea =
+            document.createElement("div");
+
+        thinkingArea.className =
+            "ore-thinking-area";
+
+        const thinkingText =
+            document.createElement("span");
+
+        thinkingText.className =
+            "ore-thinking-text";
+
+        const prompt = String(message || "").toLowerCase();
+        const activitySets = {
+            code: ["Reading the code", "Tracing the issue", "Working on a fix", "Checking the changes", "Wrapping things up"],
+            research: ["Looking for context", "Gathering the details", "Sifting through sources", "Checking key points", "Pulling it together"],
+            writing: ["Finding the right tone", "Shaping the draft", "Refining the wording", "Checking the flow", "Polishing the final touches"],
+            planning: ["Mapping the next steps", "Weighing the options", "Organizing the plan", "Checking the details", "Bringing it together"],
+            math: ["Working through the numbers", "Checking each step", "Verifying the result", "Reviewing the calculation", "Wrapping up"],
+            general: ["Taking a closer look", "Working through the details", "Checking the key points", "Putting the pieces together", "Finishing up"]
+        };
+        const pidginActivitySets = {
+            code: ["I dey read the code", "I dey trace the issue", "I dey work on a fix", "I dey check the changes", "I dey wrap am up"],
+            research: ["I dey look for context", "I dey gather the details", "I dey sift through sources", "I dey check the key points", "I dey put am together"],
+            writing: ["I dey find the right tone", "I dey shape the draft", "I dey refine the wording", "I dey check the flow", "I dey polish am"],
+            planning: ["I dey map the next steps", "I dey weigh the options", "I dey arrange the plan", "I dey check the details", "I dey bring am together"],
+            math: ["I dey work the numbers", "I dey check each step", "I dey verify the answer", "I dey review the calculation", "I dey wrap am up"],
+            general: ["Make I take a closer look", "I dey work through the details", "I dey check the key points", "I dey put the pieces together", "I dey finish up"]
+        };
+        let task = "general";
+        if (/\b(code|coding|bug|debug|javascript|python|html|css|function|compile|error|script)\b/.test(prompt)) task = "code";
+        else if (/\b(research|source|evidence|compare|latest|history|explain|why|how does|analyze|analyse)\b/.test(prompt)) task = "research";
+        else if (/\b(write|writing|draft|email|story|poem|rewrite|edit|caption|essay|wording)\b/.test(prompt)) task = "writing";
+        else if (/\b(plan|schedule|steps|organize|organise|goal|project|prepare|strategy|todo|to-do)\b/.test(prompt)) task = "planning";
+        else if (/\b(math|calculate|equation|solve|number|percent|percentage|sum|multiply|divide|\d+\s*[+*/-]\s*\d+)\b/.test(prompt)) task = "math";
+        const activityStates = (selectedLanguage === "pidgin" ? pidginActivitySets : activitySets)[task];
+        let activityIndex = 0;
+        thinkingText.textContent = activityStates[activityIndex];
+        const activityTimer = setInterval(() => {
+            if (!thinkingText.isConnected) { clearInterval(activityTimer); return; }
+            activityIndex = (activityIndex + 1) % activityStates.length;
+            thinkingText.textContent = activityStates[activityIndex];
+        }, 1900);
+
+        const starFrame = document.createElement("div");
+        starFrame.className = "ore-star-frame";
+        starFrame.setAttribute("aria-hidden", "true");
+        starFrame.innerHTML = '<span class="ore-twinkle-star">✦</span><span class="ore-twinkle-star">✦</span><span class="ore-twinkle-star">✦</span><span class="ore-twinkle-star">✦</span>';
+
+        thinkingArea.appendChild(starFrame);
+        thinkingArea.appendChild(thinkingText);
+
+        wrapper.appendChild(
+            thinkingArea
+        );
+
+        conversation.appendChild(
+            wrapper
+        );
+
+        conversation.scrollTop =
+            conversation.scrollHeight;
+
+        return wrapper;
+    }
+
+    /* =========================================================
+       USER MESSAGE
+    ========================================================= */
+
+    function addUserMessage(message) {
+
+        const wrapper =
+            document.createElement("div");
+
+        wrapper.className =
+            "ore-message ore-message-user";
+
+        chatTurnCount += 1;
+        wrapper.id = `chat-turn-${chatTurnCount}`;
+
+        const label =
+            document.createElement("div");
+
+        label.className =
+            "ore-message-label-user";
+
+        label.textContent =
+            "You";
+
+        const bubble =
+            document.createElement("div");
+
+        bubble.className =
+            "ore-user-bubble";
+
+        bubble.textContent =
+            message;
+
+        wrapper.appendChild(label);
+
+        wrapper.appendChild(bubble);
+
+        conversation.appendChild(
+            wrapper
+        );
+
+        const jumpDot = document.createElement("button");
+        jumpDot.type = "button";
+        jumpDot.className = "chat-jump-dot";
+        jumpDot.title = `Jump to message ${chatTurnCount}: ${message.slice(0, 60)}`;
+        jumpDot.setAttribute("aria-label", `Jump to message ${chatTurnCount}`);
+        jumpDot.addEventListener("click", () => {
+            document.querySelectorAll(".chat-jump-dot.active").forEach(dot => dot.classList.remove("active"));
+            jumpDot.classList.add("active");
+            wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+        chatJumpRail.appendChild(jumpDot);
+        chatJumpRail.classList.add("visible");
+
+        conversation.scrollTop =
+            conversation.scrollHeight;
+
+        return wrapper;
+    }
+
+    /* =========================================================
+       ORE RESPONSE
+       THIS IS THE IMPORTANT FIX
+    ========================================================= */
+
+    function addResponseActions(wrapper, responseText, sourcePrompt) {
+        wrapper.querySelector(".ore-response-actions")?.remove();
+        const actions = document.createElement("div");
+        actions.className = "ore-response-actions";
+
+        const makeAction = (label, icon, onClick) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "response-action";
+            button.title = label;
+            button.setAttribute("aria-label", label);
+            button.innerHTML = icon;
+            button.addEventListener("click", onClick);
+            actions.appendChild(button);
+            return button;
+        };
+
+        makeAction("Copy reply", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>', async event => {
+            const button = event.currentTarget;
+            try {
+                await navigator.clipboard.writeText(responseText);
+            } catch {
+                const fallback = document.createElement("textarea");
+                fallback.value = responseText;
+                fallback.style.position = "fixed";
+                fallback.style.opacity = "0";
+                document.body.appendChild(fallback);
+                fallback.select();
+                const copied = document.execCommand("copy");
+                fallback.remove();
+                if (!copied) { showToast("Could not copy reply"); return; }
+            }
+            button.title = "Copied";
+            showToast("Reply copied");
+            setTimeout(() => { if (button.isConnected) button.title = "Copy reply"; }, 1400);
+        });
+
+        makeAction("Read reply aloud", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>', () => {
+            if (!("speechSynthesis" in window)) { showToast("Read aloud is not available in this browser"); return; }
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(responseText));
+        });
+
+        const up = makeAction("Helpful", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12M15 5l-1 5h6a2 2 0 0 1 2 2l-2 8a2 2 0 0 1-2 2H7V10l5-8a3 3 0 0 1 3 3z"/></svg>', event => {
+            const button = event.currentTarget;
+            const active = button.classList.toggle("selected");
+            down.classList.remove("selected");
+            up.setAttribute("aria-pressed", String(active));
+            down.setAttribute("aria-pressed", "false");
+            showToast(active ? "Thanks for the feedback" : "Feedback cleared");
+        });
+        const down = makeAction("Not helpful", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2M9 19l1-5H4a2 2 0 0 1-2-2l2-8a2 2 0 0 1 2-2h9v12l-5 8a3 3 0 0 1-3-3z"/></svg>', event => {
+            const button = event.currentTarget;
+            const active = button.classList.toggle("selected");
+            up.classList.remove("selected");
+            down.setAttribute("aria-pressed", String(active));
+            up.setAttribute("aria-pressed", "false");
+            showToast(active ? "Thanks for the feedback" : "Feedback cleared");
+        });
+        up.setAttribute("aria-pressed", "false");
+        down.setAttribute("aria-pressed", "false");
+
+        makeAction("Try again", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5"/><path d="M20 12a8 8 0 1 0 2 5.3"/></svg>', () => sendMessage(sourcePrompt, false));
+        wrapper.appendChild(actions);
+    }
+
+    async function typeOreResponse(response, run = responseRun, sourcePrompt = "") {
+
+        let wrapper =
+            document.getElementById(
+                "ore-current-response"
+            );
+
+        if (wrapper) {
+
+            /*
+             * IMPORTANT:
+             *
+             * We do NOT clear wrapper.innerHTML.
+             * That used to delete the responseBox
+             * from the DOM while JavaScript was
+             * still trying to type into it.
+             *
+             * Humanity survived another JavaScript bug.
+             */
+
+            const oldThinking =
+                wrapper.querySelector(
+                    ".ore-thinking-area"
+                );
+
+            if (oldThinking) {
+                oldThinking.remove();
+            }
+
+            wrapper.removeAttribute("id");
+
+            wrapper.classList.add(
+                "generating"
+            );
+
+        } else {
+
+            wrapper =
+                document.createElement(
+                    "div"
+                );
+
+            wrapper.className =
+                "ore-message ore-message-ore generating";
+
+            const header =
+                document.createElement(
+                    "div"
+                );
+
+            header.className =
+                "ore-message-header";
+
+            const gem =
+                createOreDiamond();
+
+            const label =
+                document.createElement(
+                    "span"
+                );
+
+            label.className =
+                "ore-message-label";
+
+            label.textContent =
+                "Ore";
+
+            header.appendChild(gem);
+            header.appendChild(label);
+
+            wrapper.appendChild(header);
+
+            conversation.appendChild(
+                wrapper
+            );
+        }
+
+        let responseBox =
+            wrapper.querySelector(
+                ".ore-response"
+            );
+
+        if (!responseBox) {
+
+            responseBox =
+                document.createElement(
+                    "div"
+                );
+
+            responseBox.className =
+                "ore-response";
+
+            wrapper.appendChild(
+                responseBox
+            );
+
+        } else {
+
+            responseBox.innerHTML =
+                "";
+
+        }
+
+        const cursor =
+            document.createElement(
+                "span"
+            );
+
+        cursor.className =
+            "ore-cursor";
+
+        responseBox.appendChild(
+            cursor
+        );
+
+        conversation.scrollTop =
+            conversation.scrollHeight;
+
+        const safeResponse =
+            String(
+                response ||
+                "I no get response for that one yet."
+            );
+
+        for (
+            let i = 0;
+            i < safeResponse.length;
+            i++
+        ) {
+
+            if (!isGenerating || run !== responseRun) {
+                cursor.remove();
+                return;
+            }
+
+            cursor.remove();
+
+            responseBox.textContent +=
+                safeResponse[i];
+
+            responseBox.appendChild(
+                cursor
+            );
+
+            conversation.scrollTop =
+                conversation.scrollHeight;
+
+            let delay = 12;
+
+            if (
+                [".", ",", "!", "?"]
+                    .includes(
+                        safeResponse[i]
+                    )
+            ) {
+
+                delay = 55;
+
+            } else if (
+                safeResponse[i] === "\n"
+            ) {
+
+                delay = 35;
+            }
+
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        delay
+                    )
+            );
+        }
+
+        cursor.remove();
+
+        wrapper.classList.remove(
+            "generating"
+        );
+
+        addResponseActions(wrapper, safeResponse, sourcePrompt);
+        conversation.scrollTop =
+            conversation.scrollHeight;
+    }
+
+    /* =========================================================
+       BACKEND REQUEST
+       Ore generation API
+    ========================================================= */
+
+    const ORE_API_URL =
+        "https://luna-ore.onrender.com/generate";
+
+    function extractOreText(data) {
+
+        if (typeof data === "string") {
+            return data;
+        }
+
+        if (Array.isArray(data)) {
+            return extractOreText(data[0]);
+        }
+
+        if (data && typeof data === "object") {
+
+            const keys = [
+                "response",
+                "text",
+                "generated_text",
+                "output",
+                "reply",
+                "answer",
+                "result",
+                "message"
+            ];
+
+            for (const key of keys) {
+
+                if (typeof data[key] === "string") {
+                    return data[key];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function makeOreError(kind, detail) {
+
+        const error =
+            new Error(detail || kind);
+
+        error.oreKind = kind;
+
+        error.oreDetail = detail || "";
+
+        return error;
+    }
+
+    function describeOreError(error) {
+
+        const kind =
+            error && error.oreKind;
+
+        if (kind === "timeout") {
+
+            return "⚠️ Ore is taking longer than usual to respond. Please wait a moment and try again.";
+        }
+
+        if (kind === "network") {
+
+            return "⚠️ Ore couldn't connect just now. Please check your internet connection and try again.";
+        }
+
+        if (kind === "http") {
+
+            return "⚠️ Ore couldn't complete that request. Please try again.";
+        }
+
+        if (kind === "format") {
+
+            return "⚠️ Ore couldn't prepare a reply this time. Please try again.";
+        }
+
+        return "⚠️ Something interrupted Ore's reply. Please try again in a moment.";
+    }
+
+    async function askOre(message) {
+
+        /*
+         * The service may take a while to respond,
+         * so allow up to 5 minutes before giving up.
+         */
+
+        const controller =
+            new AbortController();
+
+        const timeContext = getLocalTimeContext();
+        const contextualMessage = [
+            `[Current local date and time: ${timeContext.localDateTime}; timezone: ${timeContext.timeZone}; time of day: ${timeContext.timeOfDay}. Use this as the present moment for time-sensitive questions, unless the user specifies another location or time.]`,
+            `User message: ${message}`
+        ].join("\n\n");
+
+        activeController = controller;
+
+        const timer =
+            setTimeout(
+                () => controller.abort(),
+                300000
+            );
+
+        let response;
+
+        try {
+
+            response =
+                await fetch(
+                    ORE_API_URL,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        /*
+                         * The message is sent under a few common
+                         * field names so the backend finds it
+                         * whichever one it expects.
+                         */
+
+                        body: JSON.stringify({
+                            message: contextualMessage,
+                            prompt: contextualMessage,
+                            text: contextualMessage,
+                            input: contextualMessage,
+                            time_context: timeContext,
+                            current_time: timeContext.localDateTime,
+                            timezone: timeContext.timeZone,
+                            time_of_day: timeContext.timeOfDay,
+                            language:
+                                selectedLanguage,
+                            model:
+                                selectedModel.id,
+                            thinking_level:
+                                selectedThinking,
+                            max_tokens:
+                                THINKING_LEVELS[
+                                    selectedThinking
+                                ].tokens
+                        }),
+
+                        signal:
+                            controller.signal
+                    }
+                );
+
+        } catch (error) {
+
+            console.error(
+                "ORE FETCH FAILED:",
+                error
+            );
+
+            if (error && error.name === "AbortError") {
+
+                if (userStopped) throw error;
+
+                throw makeOreError(
+                    "timeout",
+                    "Request took longer than 5 minutes."
+                );
+            }
+
+            throw makeOreError(
+                "network",
+                String(error && error.message)
+            );
+
+        } finally {
+
+            clearTimeout(timer);
+        }
+
+        if (!response.ok) {
+
+            let body = "";
+
+            try {
+
+                body =
+                    (await response.text())
+                        .slice(0, 300);
+
+            } catch (readError) {
+                /* ignore */
+            }
+
+            console.error(
+                "ORE HTTP ERROR:",
+                response.status,
+                body
+            );
+
+            throw makeOreError(
+                "http",
+                response.status +
+                (body ? " - " + body : "")
+            );
+        }
+
+        let data;
+
+        try {
+
+            data =
+                await response.json();
+
+        } catch (jsonError) {
+
+            throw makeOreError(
+                "format",
+                "The reply was not valid JSON."
+            );
+        }
+
+        const text =
+            extractOreText(data);
+
+        if (typeof text !== "string") {
+
+            console.error(
+                "ORE UNEXPECTED REPLY:",
+                data
+            );
+
+            throw makeOreError(
+                "format",
+                "Reply keys: " +
+                Object.keys(data || {}).join(", ")
+            );
+        }
+
+        return text;
+    }
+
+    /* =========================================================
+       SEND MESSAGE
+    ========================================================= */
+
+    async function sendMessage(messageOverride = null, showUserBubble = true) {
+
+        if (isGenerating) {
+            return;
+        }
+
+        const message =
+            (typeof messageOverride === "string" ? messageOverride : chatInput.value).trim();
+
+        if (!message) {
+            return;
+        }
+
+        isGenerating = true;
+        userStopped = false;
+        responseRun++;
+        const currentRun = responseRun;
+        sendBtn.classList.add("is-stop");
+        sendBtn.title = "Stop generating";
+        sendBtn.setAttribute("aria-label", "Stop generating");
+        sendBtn.innerHTML = '<span class="stop-square" aria-hidden="true"></span>';
+
+        document.body.classList.add(
+            "chat-active"
+        );
+
+        conversation.style.display =
+            "flex";
+
+        /*
+         * Show the user's message immediately.
+         * No waiting for Firebase.
+         * No waiting for backend.
+         */
+
+        if (showUserBubble) {
+            addUserMessage(message);
+            chatInput.value = "";
+            chatInput.style.height = "auto";
+        }
+
+        const thinkingMessage = showThinking(message);
+        startProcessingTimer(thinkingMessage);
+
+        try {
+
+            const oreResponse =
+                await askOre(message);
+
+            await typeOreResponse(
+                oreResponse,
+                currentRun,
+                message
+            );
+
+        } catch (error) {
+
+            if (!userStopped) {
+                console.error("ORE ERROR:", error);
+                await typeOreResponse(describeOreError(error), currentRun, message);
+                showToast("Ore couldn't connect. Please try again.");
+            }
+
+        } finally {
+            if (currentRun === responseRun) {
+                finishProcessingTimer();
+                isGenerating = false;
+                activeController = null;
+                sendBtn.classList.remove("is-stop");
+                sendBtn.title = "Send message";
+                sendBtn.setAttribute("aria-label", "Send message");
+                sendBtn.innerHTML = '<span class="send-arrow">↑</span>';
+                chatInput.focus();
+            }
+        }
+    }
+
+    /* =========================================================
+       SEND BUTTON
+    ========================================================= */
+
+    sendBtn.addEventListener(
+        "click",
+        () => {
+            if (!isGenerating) { sendMessage(); return; }
+            userStopped = true;
+            isGenerating = false;
+            responseRun++;
+            finishProcessingTimer();
+            if (activeController) activeController.abort();
+            const pending = document.getElementById("ore-current-response");
+            if (pending) pending.remove();
+            sendBtn.classList.remove("is-stop");
+            sendBtn.title = "Send message";
+            sendBtn.setAttribute("aria-label", "Send message");
+            sendBtn.innerHTML = '<span class="send-arrow">↑</span>';
+            chatInput.focus();
+        }
+    );
+
+    /* =========================================================
+       ENTER TO SEND
+    ========================================================= */
+
+    chatInput.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+            }
+        }
+    );
+
+    /* =========================================================
+       AUTO RESIZE INPUT
+    ========================================================= */
+
+    chatInput.addEventListener(
+        "input",
+        () => {
+
+            chatInput.style.height =
+                "auto";
+
+            chatInput.style.height =
+                Math.min(
+                    chatInput.scrollHeight,
+                    180
+                ) + "px";
+        }
+    );
+
+    /* =========================================================
+       STARTUP
+    ========================================================= */
+
+    chatInput.focus();
+
+    console.log(
+        "%cOre frontend loaded successfully.",
+        "color:#00ff66;font-weight:bold;"
+    );
+
+    console.log(
+        "Backend:",
+        ORE_API_URL
+    );
+
+    /* Wake the service in the background. */
+
+    fetch(
+        ORE_API_URL,
+        {
+            method: "GET",
+            mode: "no-cors"
+        }
+    ).catch(() => {});
+
+</script>
+
+</body>
+</html>
