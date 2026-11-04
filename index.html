@@ -526,14 +526,19 @@
         }
 
         .hero-title {
+            max-width: 100%;
             font-size: 30px;
             font-weight: 600;
             color: #ffffff;
             margin-bottom: 8px;
             letter-spacing: -0.01em;
+            line-height: 1.15;
+            text-wrap: balance;
+            overflow-wrap: anywhere;
         }
 
         .hero-subtitle {
+            max-width: min(100%, 60ch);
             margin: 0 0 28px;
             color: #8e8e8e;
             font-size: 14px;
@@ -1382,6 +1387,7 @@
             #sidebar, .sidebar-inner { width: 232px; }
             #sidebar.collapsed { margin-left: -232px; }
             .center-container { padding-left: 16px; padding-right: 16px; }
+            .hero-title { font-size: clamp(24px, 3.1vw, 30px); text-align: center; }
             .pixel-chat-bar { padding: 12px 14px; }
             .toolbar-left, .toolbar-right { gap: 7px; }
             .pixel-pill-btn { padding-left: 10px; padding-right: 10px; }
@@ -1412,7 +1418,8 @@
             }
 
             .hero-title {
-                font-size: 25px;
+                font-size: clamp(22px, 5.8vw, 25px);
+                text-align: center;
             }
 
             .toolbar-right {
@@ -1557,6 +1564,7 @@
             </button>
         </div>
         <form class="auth-email-form" id="auth-email-form">
+            <input class="auth-email-input" id="auth-name" type="text" autocomplete="name" placeholder="Your name" aria-label="Your name" maxlength="80" hidden>
             <input class="auth-email-input" id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email address" required>
             <input class="auth-email-input" id="auth-password" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" minlength="6" required>
             <button class="auth-option auth-email-submit" id="auth-email-submit" type="submit">Sign in</button>
@@ -1724,7 +1732,7 @@
                     <div class="user-avatar" id="user-avatar">M</div>
 
                     <div class="user-info">
-                        <span class="user-name" id="user-name">Murphy</span>
+                        <span class="user-name" id="user-name">Guest</span>
                         <span class="user-plan" id="user-plan">Free</span>
                     </div>
 
@@ -1791,7 +1799,7 @@
 
         <div class="center-container">
 
-            <h1 class="hero-title" id="hero-title">How can I help, Murphy?</h1>
+            <h1 class="hero-title" id="hero-title">How can I help?</h1>
             <p class="hero-subtitle" id="hero-subtitle">A fresh start, a clear mind. What shall we make progress on?</p>
 
             <div class="pixel-chat-bar">
@@ -1921,6 +1929,7 @@
         setPersistence,
         browserLocalPersistence,
         onAuthStateChanged,
+        updateProfile,
         GoogleAuthProvider,
         OAuthProvider,
         signInWithPopup,
@@ -1947,6 +1956,7 @@
     const authScreen = document.getElementById("auth-screen");
     const authOptions = document.getElementById("auth-options");
     const authEmailForm = document.getElementById("auth-email-form");
+    const authNameInput = document.getElementById("auth-name");
     const authEmailInput = document.getElementById("auth-email");
     const authPasswordInput = document.getElementById("auth-password");
     const authEmailSubmit = document.getElementById("auth-email-submit");
@@ -2035,6 +2045,8 @@
         authOptions.style.display = "none";
         authEmailForm.classList.add("visible");
         authMode = "signin";
+        authNameInput.hidden = true;
+        authNameInput.required = false;
         authPasswordInput.autocomplete = "current-password";
         authEmailSubmit.textContent = "Sign in";
         authAccountSwitch.textContent = "Create an account";
@@ -2049,6 +2061,8 @@
     authAccountSwitch.addEventListener("click", () => {
         authMode = authMode === "signin" ? "signup" : "signin";
         const creatingAccount = authMode === "signup";
+        authNameInput.hidden = !creatingAccount;
+        authNameInput.required = creatingAccount;
         authPasswordInput.autocomplete = creatingAccount ? "new-password" : "current-password";
         authEmailSubmit.textContent = creatingAccount ? "Create account" : "Sign in";
         authAccountSwitch.textContent = creatingAccount ? "Already have an account? Sign in" : "Create an account";
@@ -2056,12 +2070,20 @@
     });
     authEmailForm.addEventListener("submit", async event => {
         event.preventDefault();
-        if (!authEmailInput.reportValidity() || !authPasswordInput.reportValidity()) return;
+        if ((authMode === "signup" && !authNameInput.reportValidity()) || !authEmailInput.reportValidity() || !authPasswordInput.reportValidity()) return;
         setAuthStatus(authMode === "signup" ? "Creating your account…" : "Signing you in…");
-        const authenticate = authMode === "signup" ? createUserWithEmailAndPassword : signInWithEmailAndPassword;
         try {
             await persistenceReady;
-            await authenticate(firebaseAuth, authEmailInput.value.trim(), authPasswordInput.value);
+            if (authMode === "signup") {
+                const credential = await createUserWithEmailAndPassword(firebaseAuth, authEmailInput.value.trim(), authPasswordInput.value);
+                await updateProfile(credential.user, { displayName: authNameInput.value.trim() });
+                currentGreetingName = getFirstName(credential.user);
+                document.getElementById("user-name").textContent = credential.user.displayName;
+                document.getElementById("user-avatar").textContent = currentGreetingName.slice(0, 1).toUpperCase();
+                if (greetingDataReady) showFreshGreeting();
+            } else {
+                await signInWithEmailAndPassword(firebaseAuth, authEmailInput.value.trim(), authPasswordInput.value);
+            }
             authEmailForm.reset();
         } catch (error) {
             console.error("Email sign-in failed:", error);
@@ -2103,21 +2125,33 @@
     const chatInput =
         document.getElementById("chat-input");
 
+    let currentGreetingName = "there";
+    let greetingDataReady = false;
+
+    function getFirstName(user) {
+        const sourceName = user?.displayName?.trim() || user?.email?.split("@")[0] || "";
+        const firstName = sourceName.split(/[\s._-]+/).filter(Boolean)[0] || "there";
+        return firstName.charAt(0).toLocaleUpperCase() + firstName.slice(1);
+    }
+
     onAuthStateChanged(firebaseAuth, user => {
         authScreen.hidden = Boolean(user);
         document.body.classList.toggle("authenticated", Boolean(user));
         if (user) {
             authEmailForm.reset();
             const displayName = user.displayName || (user.email ? user.email.split("@")[0] : "Ore user");
+            currentGreetingName = getFirstName(user);
             document.getElementById("user-name").textContent = displayName;
             document.getElementById("user-plan").textContent = user.email || "Signed in";
             document.getElementById("user-avatar").textContent = displayName.slice(0, 1).toUpperCase();
             chatInput.focus();
         } else {
-            document.getElementById("user-name").textContent = "Murphy";
+            currentGreetingName = "there";
+            document.getElementById("user-name").textContent = "Guest";
             document.getElementById("user-plan").textContent = "Free";
-            document.getElementById("user-avatar").textContent = "M";
+            document.getElementById("user-avatar").textContent = "G";
         }
+        if (greetingDataReady) showFreshGreeting();
     });
 
     const sendBtn =
@@ -2206,14 +2240,14 @@
     }
 
     const greetings = [
-        ["Good morning, Murphy.", "A new day, a fresh page. What would you like to work on?"],
-        ["Good afternoon, Murphy.", "Let’s make a little progress on something that matters."],
-        ["Good evening, Murphy.", "Take a breath. What can I help you figure out tonight?"],
-        ["Ready when you are, Murphy.", "Bring a question, a plan, or a half-formed idea."],
-        ["What’s on your mind, Murphy?", "We can think it through one step at a time."],
+        ["Good morning, {name}.", "A new day, a fresh page. What would you like to work on?"],
+        ["Good afternoon, {name}.", "Let’s make a little progress on something that matters."],
+        ["Good evening, {name}.", "Take a breath. What can I help you figure out tonight?"],
+        ["Ready when you are, {name}.", "Bring a question, a plan, or a half-formed idea."],
+        ["What’s on your mind, {name}?", "We can think it through one step at a time."],
         ["Let’s make today count.", "What would feel good to get done?"],
         ["A little progress adds up.", "Choose one thing and we’ll get started."],
-        ["Welcome back, Murphy.", "Pick up where you left off or start somewhere new."],
+        ["Welcome back, {name}.", "Pick up where you left off or start somewhere new."],
         ["Your next idea starts here.", "Tell me what you’re curious about."],
         ["Need a hand with something?", "I’m here for the big questions and the small ones."],
         ["Let’s untangle that thought.", "Share whatever you have so far; it needn’t be polished."],
@@ -2224,7 +2258,7 @@
         ["One question can open a lot.", "What would you like to know?"],
         ["Let’s find a clearer path.", "Tell me what feels stuck or uncertain."],
         ["Small steps, real momentum.", "What’s one thing we can move forward?"],
-        ["Good to see you, Murphy.", "What would you like to make, learn, or solve?"],
+        ["Good to see you, {name}.", "What would you like to make, learn, or solve?"],
         ["Take your idea for a walk.", "I can help you explore where it might lead."],
         ["Curiosity looks good on you.", "What have you been wondering about?"],
         ["Let’s turn a thought into a plan.", "Tell me the goal and we’ll map the way."],
@@ -2266,7 +2300,7 @@
         ["What’s something you’d like to make happen?", "We can turn the goal into a few doable steps."],
         ["You can start with ‘I’m not sure…’", "We’ll work out the question together."],
         ["Let’s find a way through.", "What’s the challenge in front of you?"],
-        ["Good morning, Murphy. What’s the first small win?", "A little momentum can change the whole day."],
+        ["Good morning, {name}. What’s the first small win?", "A little momentum can change the whole day."],
         ["Good afternoon. Let’s pick up a thread.", "What would you like to make progress on?"],
         ["Good evening. One last idea to explore?", "I’m here to help you think it through."],
         ["A thought, a question, a possibility.", "Whatever you have, we can start there."],
@@ -2296,7 +2330,7 @@
         ["What deserves a closer look?", "Let’s explore it with care and curiosity."],
         ["You’re one message from a fresh start.", "What shall we work on?"],
         ["Let’s find the simplest next step.", "Tell me what you’re aiming for."],
-        ["Make today yours, Murphy.", "What would you like to focus on first?"],
+        ["Make today yours, {name}.", "What would you like to focus on first?"],
         ["There’s a way to begin.", "Let’s find it together, one thought at a time."],
         ["What would be useful right now?", "A quick answer, a thoughtful plan, or a fresh idea?"],
         ["Let’s get from wondering to understanding.", "What are you curious about today?"],
@@ -2304,21 +2338,21 @@
     ];
 
     const pidginGreetings = [
-        ["Good morning, Murphy.", "Make we start today with one good idea. Wetin you wan work on?"],
-        ["Good afternoon, Murphy.", "Wetin you wan make progress on today? Make we do am small small."],
-        ["Good evening, Murphy.", "Take small break. Wetin I fit help you think through tonight?"],
-        ["Wetin dey your mind, Murphy?", "Talk am as e be; we go reason am together."],
+        ["Good morning, {name}.", "Make we start today with one good idea. Wetin you wan work on?"],
+        ["Good afternoon, {name}.", "Wetin you wan make progress on today? Make we do am small small."],
+        ["Good evening, {name}.", "Take small break. Wetin I fit help you think through tonight?"],
+        ["Wetin dey your mind, {name}?", "Talk am as e be; we go reason am together."],
         ["Wetin we dey work on today?", "Na plan, question, or fresh idea? Make we start."],
         ["Make we make today count.", "Which one thing go make you feel say you don move forward?"],
         ["Small progress still be progress.", "Wetin be one thing we fit move forward now?"],
-        ["You don come back, Murphy.", "We fit continue where you stop or start something new."],
+        ["You don come back, {name}.", "We fit continue where you stop or start something new."],
         ["Your next idea fit start here.", "Tell me wetin you dey curious about."],
         ["You need help with something?", "Big matter or small one, I dey here."],
         ["Make we arrange that thought.", "Tell me wetin you get so far; e no need perfect."],
         ["Wetin you wan understand today?", "Ask me anything; we go take am at your pace."],
         ["Make we find clear way forward.", "Tell me wetin dey confuse you or hold you back."],
         ["One small step fit start am.", "Wetin be the next thing you wan tackle?"],
-        ["E good to see you, Murphy.", "Wetin you wan create, learn, or solve?"],
+        ["E good to see you, {name}.", "Wetin you wan create, learn, or solve?"],
         ["Your curiosity get home here.", "Which thing you wan make we look into?"],
         ["No need for perfect prompt.", "Just tell me wetin dey your mind."],
         ["Make we turn idea to plan.", "Tell me wetin you wan achieve; we go map the steps."],
@@ -2354,32 +2388,36 @@
         ["You fit start with small thing.", "Make we find am together."],
         ["Wetin go help you right now?", "Quick answer, thoughtful plan, or fresh idea?"],
         ["Make we move from question to understanding.", "Wetin you dey curious about today?"],
-        ["Make today your own, Murphy.", "Wetin you wan focus on first?"]
+        ["Make today your own, {name}.", "Wetin you wan focus on first?"]
     ];
+
+    let lastGreetingTimeOfDay = "";
 
     function showFreshGreeting() {
         const timeOfDay = getLocalTimeContext().timeOfDay;
+        lastGreetingTimeOfDay = timeOfDay;
         const choices = selectedLanguage === "pidgin" ? pidginGreetings : greetings;
-        const timelyGreetings = selectedLanguage === "pidgin"
+        const timedTitles = selectedLanguage === "pidgin"
             ? {
-                dawn: ["Day just dey break, Murphy.", "Make we start this fresh day with one good idea."],
-                morning: ["Good morning, Murphy.", "Make we start today with one good idea. Wetin you wan work on?"],
-                afternoon: ["Good afternoon, Murphy.", "Wetin you wan make progress on today? Make we do am small small."],
-                evening: ["Good evening, Murphy.", "Wetin I fit help you think through this evening?"],
-                night: ["You still dey up, Murphy?", "Tell me wetin dey your mind; we go reason am together."]
+                dawn: ["Day don dey break, {name}.", "New day don start, {name}.", "You don wake early, {name}?"],
+                morning: ["Good morning, {name}.", "Morning, {name}—wetin dey your mind?", "Wetin we go work on this morning, {name}?"],
+                afternoon: ["Good afternoon, {name}.", "How afternoon dey go, {name}?", "Wetin we go make progress on this afternoon, {name}?"],
+                evening: ["Good evening, {name}.", "How your evening dey go, {name}?", "Wetin you wan think through this evening, {name}?"],
+                night: ["You still dey up, {name}?", "Night don reach, {name}—wetin dey your mind?", "Make we reason this one together, {name}."]
             }
             : {
-                dawn: ["A new day is just beginning, Murphy.", "What would you like to start with?"],
-                morning: greetings[0],
-                afternoon: greetings[1],
-                evening: greetings[2],
-                night: ["Burning the midnight oil, Murphy?", "What can I help you think through tonight?"]
+                dawn: ["The day is just beginning, {name}.", "A fresh start, {name}?", "Up with the early light, {name}?"],
+                morning: ["Good morning, {name}.", "Morning, {name}—what’s on your list?", "Ready for a fresh start, {name}?"],
+                afternoon: ["Good afternoon, {name}.", "How’s your afternoon going, {name}?", "What shall we make progress on this afternoon, {name}?"],
+                evening: ["Good evening, {name}.", "How’s your evening going, {name}?", "What can I help you work through tonight, {name}?"],
+                night: ["Still up, {name}?", "Burning the midnight oil, {name}?", "What’s on your mind tonight, {name}?"]
             };
-        const greeting = Math.random() < .4
-            ? timelyGreetings[timeOfDay]
-            : choices[Math.floor(Math.random() * choices.length)];
-        heroTitle.textContent = greeting[0];
-        heroSubtitle.textContent = greeting[1];
+        const firstName = currentGreetingName || "there";
+        const titleChoices = timedTitles[timeOfDay];
+        const greetingTitle = titleChoices[Math.floor(Math.random() * titleChoices.length)];
+        const greetingDetails = choices[Math.floor(Math.random() * choices.length)];
+        heroTitle.textContent = greetingTitle.replaceAll("{name}", firstName);
+        heroSubtitle.textContent = greetingDetails[1].replaceAll("{name}", firstName);
     }
 
     attachmentBtn.addEventListener("click", event => {
@@ -2427,6 +2465,12 @@
     let selectedLanguage = "pidgin";
 
     showFreshGreeting();
+    greetingDataReady = true;
+    window.setInterval(() => {
+        if (greetingDataReady && getLocalTimeContext().timeOfDay !== lastGreetingTimeOfDay) {
+            showFreshGreeting();
+        }
+    }, 60000);
 
     let isGenerating = false;
 
@@ -3283,6 +3327,7 @@
                 document.body.classList.remove(
                     "chat-active"
                 );
+                showFreshGreeting();
 
                 chatInput.value = "";
 
