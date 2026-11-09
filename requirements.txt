@@ -4,4 +4,6 @@ numpy
 fastapi==0.115.0
 uvicorn==0.30.6
 pydantic==2.9.2
-tiktoken==0.8.0
+tiktoken==0.8.
+transformers>=4.45,<5
+safetensors
