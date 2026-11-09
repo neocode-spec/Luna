@@ -1,184 +1,167 @@
+
 """
-luna_model.py  -  the Luna 1.4 model, shared by train.py and app.py
+WANING 1.5
+GPT-2 based language model configuration.
 
-Keeping the model in ONE file means training and the server can never
-disagree about the architecture. If you change a number below, delete the
-old weights and train again.
+Architecture:
+- 13 transformer layers
+- 640 hidden dimensions
+- 10 attention heads
+- 1024 context length
+- 16000 vocabulary size
+
+Model weights and tokenizer are loaded from the
+Hugging Face checkpoint in the project directory.
 """
 
-import json
-
-import tiktoken
+import os
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
 
-# ---------------------------------------------------------------
-# Model size  (about 5M parameters with the compact vocabulary)
-# ---------------------------------------------------------------
+from transformers import (
+    GPT2Config,
+    GPT2LMHeadModel,
+    AutoTokenizer,
+    AutoModelForCausalLM,
+)
 
-block_size = 128     # how many tokens the model can look back at
-n_embd = 256
-n_head = 8
-n_layer = 6
-dropout = 0.1
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
-END_TOKEN = "<|endoftext|>"
-VOCAB_FILE = "luna_vocab.json"
-WEIGHTS_FILE = "luna_1.4_weights.pt"
+MODEL_NAME = "WANING 1.5"
+MODEL_VERSION = "1.5.0"
 
-# ---------------------------------------------------------------
-# Compact tokenizer
-#
-# GPT-2 has 50,257 tokens, but your chat data only uses about a thousand
-# of them. Keeping just those makes the model smaller, faster to train and
-# much faster to answer on Render. Any word the model has not seen is
-# split into single bytes, so nothing a user types can break it.
-# ---------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-class LunaTokenizer:
+VOCAB_SIZE = 16000
+CONTEXT_LENGTH = 1024
+EMBEDDING_SIZE = 640
+NUM_LAYERS = 13
+NUM_HEADS = 10
+INNER_SIZE = 2560
 
-    def __init__(self, kept_ids):
-        self.enc = tiktoken.get_encoding("gpt2")
-        self.kept_ids = list(kept_ids)
-        self.to_small = {t: i for i, t in enumerate(self.kept_ids)}
-        self.byte_tokens = [self.enc.encode_single_token(bytes([b])) for b in range(256)]
-        self.end_id = self.to_small[self.enc.eot_token]
-        self.vocab_size = len(self.kept_ids)
+DEVICE = torch.device("cpu")
 
-    @classmethod
-    def build(cls, text):
-        enc = tiktoken.get_encoding("gpt2")
-        used = set(enc.encode(text, allowed_special={END_TOKEN}))
-        used |= {enc.encode_single_token(bytes([b])) for b in range(256)}
-        used.add(enc.eot_token)
-        return cls(sorted(used))
 
-    def encode(self, text):
-        out = []
-        for t in self.enc.encode(text, allowed_special={END_TOKEN}):
-            if t in self.to_small:
-                out.append(self.to_small[t])
-            else:
-                for b in self.enc.decode_single_token_bytes(t):
-                    out.append(self.to_small[self.byte_tokens[b]])
-        return out
+# ============================================================
+# DEVICE CONFIGURATION
+# ============================================================
 
-    def decode(self, ids):
-        return self.enc.decode([self.kept_ids[i] for i in ids])
+torch.set_num_threads(1)
 
-    def save(self, path=VOCAB_FILE):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.kept_ids, f)
 
-    @classmethod
-    def load(cls, path=VOCAB_FILE):
-        with open(path, "r", encoding="utf-8") as f:
-            return cls(json.load(f))
+# ============================================================
+# MODEL CONFIGURATION
+# ============================================================
 
-# ---------------------------------------------------------------
-# Transformer
-# ---------------------------------------------------------------
+def create_config():
 
-class CausalSelfAttention(nn.Module):
+    return GPT2Config(
+        vocab_size=VOCAB_SIZE,
+        n_positions=CONTEXT_LENGTH,
+        n_ctx=CONTEXT_LENGTH,
+        n_embd=EMBEDDING_SIZE,
+        n_layer=NUM_LAYERS,
+        n_head=NUM_HEADS,
+        n_inner=INNER_SIZE,
+        activation_function="gelu_new",
+        resid_pdrop=0.1,
+        embd_pdrop=0.1,
+        attn_pdrop=0.1,
+        layer_norm_epsilon=1e-5,
+        initializer_range=0.02,
+        use_cache=True,
+        bos_token_id=2,
+        eos_token_id=3,
+        pad_token_id=0
+    )
 
-    def __init__(self):
-        super().__init__()
-        self.qkv = nn.Linear(n_embd, 3 * n_embd, bias=False)
-        self.proj = nn.Linear(n_embd, n_embd)
-        self.attn_drop = nn.Dropout(dropout)
-        self.resid_drop = nn.Dropout(dropout)
-        self.register_buffer(
-            "mask",
-            torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
+
+# ============================================================
+# LOAD TOKENIZER
+# ============================================================
+
+def load_tokenizer():
+
+    print("Loading WANING 1.5 tokenizer...")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        BASE_DIR,
+        local_files_only=True
+    )
+
+    if len(tokenizer) != VOCAB_SIZE:
+        raise ValueError(
+            f"Expected {VOCAB_SIZE} tokenizer tokens, "
+            f"found {len(tokenizer)}."
         )
 
-    def forward(self, x):
-        B, T, C = x.shape
-        q, k, v = self.qkv(x).split(n_embd, dim=2)
-        q = q.view(B, T, n_head, C // n_head).transpose(1, 2)
-        k = k.view(B, T, n_head, C // n_head).transpose(1, 2)
-        v = v.view(B, T, n_head, C // n_head).transpose(1, 2)
-
-        att = (q @ k.transpose(-2, -1)) * (k.size(-1) ** -0.5)
-        att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float("-inf"))
-        att = self.attn_drop(F.softmax(att, dim=-1))
-
-        y = (att @ v).transpose(1, 2).contiguous().view(B, T, C)
-        return self.resid_drop(self.proj(y))
+    return tokenizer
 
 
-class Block(nn.Module):
+# ============================================================
+# LOAD TRAINED MODEL
+# ============================================================
 
-    def __init__(self):
-        super().__init__()
-        self.ln1 = nn.LayerNorm(n_embd)
-        self.attn = CausalSelfAttention()
-        self.ln2 = nn.LayerNorm(n_embd)
-        self.ffwd = nn.Sequential(
-            nn.Linear(n_embd, 4 * n_embd),
-            nn.GELU(),
-            nn.Linear(4 * n_embd, n_embd),
-            nn.Dropout(dropout),
-        )
+def load_model():
 
-    def forward(self, x):
-        x = x + self.attn(self.ln1(x))
-        return x + self.ffwd(self.ln2(x))
+    print("Loading WANING 1.5 checkpoint...")
+
+    model = AutoModelForCausalLM.from_pretrained(
+        BASE_DIR,
+        local_files_only=True
+    )
+
+    config = model.config
+
+    expected = {
+        "vocab_size": VOCAB_SIZE,
+        "n_positions": CONTEXT_LENGTH,
+        "n_embd": EMBEDDING_SIZE,
+        "n_layer": NUM_LAYERS,
+        "n_head": NUM_HEADS,
+    }
+
+    for key, expected_value in expected.items():
+
+        actual_value = getattr(config, key)
+
+        if actual_value != expected_value:
+            raise ValueError(
+                f"Architecture mismatch: {key}. "
+                f"Expected {expected_value}, "
+                f"found {actual_value}."
+            )
+
+    model.to(DEVICE)
+    model.eval()
+
+    print("WANING 1.5 loaded successfully.")
+
+    print(
+        "Parameters:",
+        f"{sum(p.numel() for p in model.parameters()):,}"
+    )
+
+    return model
 
 
-class LunaGPT(nn.Module):
+# ============================================================
+# MODEL INFORMATION
+# ============================================================
 
-    def __init__(self, vocab_size):
-        super().__init__()
-        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block() for _ in range(n_layer)])
-        self.ln_f = nn.LayerNorm(n_embd)
-        self.lm_head = nn.Linear(n_embd, vocab_size)
-        self.apply(self._init_weights)
+def get_model_info(model):
 
-    @staticmethod
-    def _init_weights(module):
-        if isinstance(module, nn.Linear):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-
-    def forward(self, idx, targets=None, last_only=False):
-        B, T = idx.shape
-        pos = torch.arange(T, device=idx.device)
-        x = self.token_embedding_table(idx) + self.position_embedding_table(pos)
-        x = self.ln_f(self.blocks(x))
-
-        if targets is None:
-            # when answering we only need the last position, which saves a lot of work
-            if last_only:
-                x = x[:, -1:, :]
-            return self.lm_head(x), None
-
-        logits = self.lm_head(x)
-        loss = F.cross_entropy(logits.view(B * T, -1), targets.view(B * T))
-        return logits, loss
-
-    @torch.no_grad()
-    def generate(self, idx, max_new_tokens, stop_ids=(), temperature=0.7, top_k=40):
-        for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block_size:]
-            logits, _ = self(idx_cond, last_only=True)
-            logits = logits[:, -1, :] / max(temperature, 1e-5)
-
-            if top_k:
-                values, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < values[:, [-1]]] = -float("inf")
-
-            probs = F.softmax(logits, dim=-1)
-            next_id = torch.multinomial(probs, num_samples=1)
-            idx = torch.cat((idx, next_id), dim=1)
-
-            if next_id.item() in stop_ids:
-                break
-
-        return idx
+    return {
+        "name": MODEL_NAME,
+        "version": MODEL_VERSION,
+        "parameters": sum(
+            p.numel() for p in model.parameters()
+        ),
+        "vocabulary": model.config.vocab_size,
+        "layers": model.config.n_layer,
+        "embedding_size": model.config.n_embd,
+        "attention_heads": model.config.n_head,
+        "context_length": model.config.n_positions,
+        "device": str(DEVICE),
+    }
