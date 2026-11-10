@@ -2672,8 +2672,7 @@
     const LUNA_MODELS = [
         {
             id: "luna-1.4",
-            label: "Waning 1.5",
-            description: "18.2M parameter model"
+            label: "Waning 1.5"
         },
         {
             id: "luna-1.9-pro",
@@ -2800,7 +2799,7 @@
                     ${model.locked ? LOCK_SVG : CHECK_SVG}
                     <span class="menu-text">
                         <span class="menu-title">${model.label}</span>
-                        <span class="menu-sub">${model.description}</span>
+                        ${model.description ? `<span class="menu-sub">${model.description}</span>` : ""}
                     </span>
                 </button>
             `;
@@ -3417,6 +3416,22 @@
             oldThinking.remove();
         }
 
+        const prompt = String(message || "").toLowerCase();
+        let task = "general";
+        if (/\b(code|coding|bug|debug|javascript|python|html|css|function|compile|error|script|implement|refactor)\b/.test(prompt)) task = "code";
+        else if (/\b(research|source|evidence|compare|latest|history|explain|analy[sz]e|investigate|summari[sz]e)\b/.test(prompt)) task = "research";
+        else if (/\b(write|writing|draft|email|story|poem|rewrite|edit|caption|essay|wording)\b/.test(prompt)) task = "writing";
+        else if (/\b(plan|schedule|steps|organize|organise|goal|project|prepare|strategy|todo|to-do)\b/.test(prompt)) task = "planning";
+        else if (/\b(math|calculate|equation|solve|number|percent|percentage|sum|multiply|divide)\b|\d+\s*[+*/-]\s*\d+/.test(prompt)) task = "math";
+
+        const explicitSearch = /\b(search|browse|look up|find sources|search the web|search online)\b/.test(prompt);
+        const proOrDeepMode = selectedThinking === "high"
+            || thinkBtn.classList.contains("active")
+            || /pro/i.test(selectedModel?.label || "");
+        const substantialTask = task !== "general" && prompt.length >= 45;
+        const detailedPrompt = prompt.length >= 180 || (prompt.match(/[.!?\n]/g) || []).length >= 3;
+        if (!explicitSearch && !proOrDeepMode && !substantialTask && !detailedPrompt) return null;
+
         const wrapper =
             document.createElement("div");
 
@@ -3438,7 +3453,6 @@
         thinkingText.className =
             "ore-thinking-text";
 
-        const prompt = String(message || "").toLowerCase();
         const activitySets = {
             code: ["Reading the code", "Tracing the issue", "Working on a fix", "Checking the changes", "Wrapping things up"],
             research: ["Looking for context", "Gathering the details", "Sifting through sources", "Checking key points", "Pulling it together"],
@@ -3455,13 +3469,11 @@
             math: ["I dey work the numbers", "I dey check each step", "I dey verify the answer", "I dey review the calculation", "I dey wrap am up"],
             general: ["Make I take a closer look", "I dey work through the details", "I dey check the key points", "I dey put the pieces together", "I dey finish up"]
         };
-        let task = "general";
-        if (/\b(code|coding|bug|debug|javascript|python|html|css|function|compile|error|script)\b/.test(prompt)) task = "code";
-        else if (/\b(research|source|evidence|compare|latest|history|explain|why|how does|analyze|analyse)\b/.test(prompt)) task = "research";
-        else if (/\b(write|writing|draft|email|story|poem|rewrite|edit|caption|essay|wording)\b/.test(prompt)) task = "writing";
-        else if (/\b(plan|schedule|steps|organize|organise|goal|project|prepare|strategy|todo|to-do)\b/.test(prompt)) task = "planning";
-        else if (/\b(math|calculate|equation|solve|number|percent|percentage|sum|multiply|divide|\d+\s*[+*/-]\s*\d+)\b/.test(prompt)) task = "math";
-        const activityStates = (selectedLanguage === "pidgin" ? pidginActivitySets : activitySets)[task];
+        const activityStates = [...(selectedLanguage === "pidgin" ? pidginActivitySets : activitySets)[task]];
+        for (let i = activityStates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [activityStates[i], activityStates[j]] = [activityStates[j], activityStates[i]];
+        }
         let activityIndex = 0;
         thinkingText.textContent = activityStates[activityIndex];
         const activityTimer = setInterval(() => {
