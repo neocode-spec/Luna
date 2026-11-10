@@ -1,11 +1,12 @@
 
 import os
+import logging
 import torch
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================
@@ -13,28 +14,34 @@ from pydantic import BaseModel, Field
 # ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = BASE_DIR
+MODEL_DIR = os.getenv("MODEL_DIR", BASE_DIR)
 
 MODEL_NAME = "WANING 1.5"
-MODEL_VERSION = "1.5.0"
+MODEL_VERSION = "1.5.1"
 
 MAX_NEW_TOKENS = 300
-MAX_INPUT_TOKENS = 1024
+MAX_CONTEXT_LENGTH = 1024
+MAX_INPUT_TOKENS = MAX_CONTEXT_LENGTH - MAX_NEW_TOKENS
+
+DEFAULT_NEW_TOKENS = 150
 
 DEVICE = torch.device("cpu")
 
 torch.set_num_threads(1)
 
-print("=" * 55)
-print("INITIALIZING WANING 1.5")
-print("=" * 55)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("waning")
+
+logger.info("=" * 55)
+logger.info("INITIALIZING WANING 1.5")
+logger.info("=" * 55)
 
 
 # ============================================================
 # LOAD TOKENIZER
 # ============================================================
 
-print("Loading WANING 1.5 tokenizer...")
+logger.info("Loading WANING tokenizer...")
 
 try:
     tokenizer = AutoTokenizer.from_pretrained(
@@ -52,17 +59,18 @@ except Exception as error:
 # LOAD MODEL
 # ============================================================
 
-print("Loading WANING 1.5 model...")
+logger.info("Loading WANING model...")
 
 try:
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_DIR,
-        local_files_only=True
+        local_files_only=True,
+        use_safetensors=True
     )
 
 except Exception as error:
     raise RuntimeError(
-        f"WANING 1.5 model loading failed: {error}"
+        f"Model loading failed: {error}"
     ) from error
 
 
@@ -78,53 +86,45 @@ parameter_count = sum(
     for parameter in model.parameters()
 )
 
-embedding_size = (
-    model.get_input_embeddings().weight.shape[0]
-)
-
+embedding_size = model.get_input_embeddings().weight.shape[0]
 tokenizer_size = len(tokenizer)
 
-print("\nMODEL VERIFICATION")
-
-print("Model:", MODEL_NAME)
-print("Parameters:", f"{parameter_count:,}")
-print("Tokenizer vocabulary:", tokenizer_size)
-print("Model vocabulary:", model.config.vocab_size)
-print("Embedding vocabulary:", embedding_size)
-print("Device:", DEVICE)
+logger.info("MODEL VERIFICATION")
+logger.info("Name: %s", MODEL_NAME)
+logger.info("Parameters: %s", f"{parameter_count:,}")
+logger.info("Tokenizer vocabulary: %s", tokenizer_size)
+logger.info("Model vocabulary: %s", model.config.vocab_size)
+logger.info("Embedding vocabulary: %s", embedding_size)
+logger.info("Context length: %s", model.config.n_positions)
+logger.info("Device: %s", DEVICE)
 
 if model.config.vocab_size != embedding_size:
-    raise RuntimeError(
-        "Model configuration and embedding vocabulary mismatch."
-    )
+    raise RuntimeError("Model vocabulary and embeddings mismatch.")
 
-if tokenizer_size > embedding_size:
+if tokenizer_size != model.config.vocab_size:
     raise RuntimeError(
-        "Tokenizer vocabulary exceeds model embedding size."
+        f"Tokenizer/model vocabulary mismatch: "
+        f"{tokenizer_size} vs {model.config.vocab_size}"
     )
 
 if tokenizer.pad_token_id is None:
-    raise RuntimeError(
-        "WANING tokenizer is missing its PAD token."
-    )
+    raise RuntimeError("Tokenizer is missing PAD token.")
 
 if tokenizer.eos_token_id is None:
-    raise RuntimeError(
-        "WANING tokenizer is missing its EOS token."
-    )
+    raise RuntimeError("Tokenizer is missing EOS token.")
 
 if tokenizer.pad_token_id >= embedding_size:
-    raise RuntimeError(
-        "PAD token ID exceeds model vocabulary."
-    )
+    raise RuntimeError("PAD token ID exceeds model vocabulary.")
 
 if tokenizer.eos_token_id >= embedding_size:
+    raise RuntimeError("EOS token ID exceeds model vocabulary.")
+
+if model.config.n_positions < MAX_CONTEXT_LENGTH:
     raise RuntimeError(
-        "EOS token ID exceeds model vocabulary."
+        "Configured generation context exceeds model context."
     )
 
-print("\nWANING 1.5 LOADED SUCCESSFULLY")
-print("=" * 55)
+logger.info("WANING 1.5 LOADED SUCCESSFULLY")
 
 
 # ============================================================
@@ -152,15 +152,17 @@ app.add_middleware(
 
 class PromptRequest(BaseModel):
 
+    model_config = ConfigDict(extra="ignore")
+
     prompt: str = ""
     message: str = ""
     text: str = ""
     input: str = ""
 
     max_tokens: int = Field(
-        default=40,
+        default=DEFAULT_NEW_TOKENS,
         ge=1,
-        le=40
+        le=MAX_NEW_TOKENS
     )
 
     language: str = "english"
@@ -180,7 +182,9 @@ def root():
         "model": MODEL_NAME,
         "version": MODEL_VERSION,
         "parameters": parameter_count,
-        "device": str(DEVICE)
+        "device": str(DEVICE),
+        "max_tokens": MAX_NEW_TOKENS,
+        "context_length": MAX_CONTEXT_LENGTH
     }
 
 
@@ -190,12 +194,24 @@ def health():
     return {
         "status": "healthy",
         "model": MODEL_NAME,
+        "version": MODEL_VERSION,
         "loaded": True
     }
 
 
+@app.get("/generate")
+@app.get("/generate/")
+def generate_get_fallback():
+
+    return {
+        "status": "ready",
+        "model": MODEL_NAME,
+        "message": "Send a POST request to generate text."
+    }
+
+
 # ============================================================
-# GENERATION ENDPOINT
+# TEXT GENERATION
 # ============================================================
 
 @app.post("/generate")
@@ -216,13 +232,12 @@ def generate_text(req: PromptRequest):
             detail="A prompt is required."
         )
 
+    # Respect the model's actual context window.
+
     tokens_to_generate = min(
-        max(req.max_tokens, 1),
+        req.max_tokens,
         MAX_NEW_TOKENS
     )
-
-    # Conversation format used by the existing
-    # WANING inference implementation.
 
     formatted_prompt = (
         f"User: {user_prompt}\n"
@@ -230,8 +245,6 @@ def generate_text(req: PromptRequest):
     )
 
     try:
-
-        # Tokenize input.
 
         inputs = tokenizer(
             formatted_prompt,
@@ -245,33 +258,27 @@ def generate_text(req: PromptRequest):
             for key, value in inputs.items()
         }
 
-        # Generate response.
+        input_length = inputs["input_ids"].shape[1]
+
+        if input_length + tokens_to_generate > MAX_CONTEXT_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail="Prompt exceeds available model context."
+            )
 
         with torch.inference_mode():
 
             output = model.generate(
                 **inputs,
-
                 max_new_tokens=tokens_to_generate,
-
                 do_sample=True,
-
                 temperature=0.7,
-
                 top_p=0.9,
-
                 repetition_penalty=1.1,
-
                 pad_token_id=tokenizer.pad_token_id,
-
                 eos_token_id=tokenizer.eos_token_id,
-
                 use_cache=True
             )
-
-        # Extract only newly generated tokens.
-
-        input_length = inputs["input_ids"].shape[1]
 
         generated_tokens = output[0][input_length:]
 
@@ -281,33 +288,34 @@ def generate_text(req: PromptRequest):
             clean_up_tokenization_spaces=True
         ).strip()
 
-        # Stop at the beginning of another conversation turn.
-
         stop_markers = [
             "\nUser:",
             "\nHuman:",
             "\nuser:",
-            "\nHuman ",
+            "\nHuman "
         ]
 
         for marker in stop_markers:
 
             if marker in response:
+                response = response.split(marker, 1)[0].strip()
 
-                response = response.split(
-                    marker,
-                    1
-                )[0].strip()
+        if not response:
+            logger.warning("Model returned an empty response.")
 
         return {
             "response": response,
             "model": "waning-1.5",
-            "version": MODEL_VERSION
+            "version": MODEL_VERSION,
+            "tokens_generated": len(generated_tokens)
         }
 
-    except Exception as error:
+    except HTTPException:
+        raise
 
-        print("GENERATION ERROR:", str(error))
+    except Exception:
+
+        logger.exception("WANING generation failed.")
 
         raise HTTPException(
             status_code=500,
@@ -316,15 +324,15 @@ def generate_text(req: PromptRequest):
 
 
 # ============================================================
-# STARTUP INFORMATION
+# STARTUP
 # ============================================================
 
 @app.on_event("startup")
 async def startup_event():
 
-    print("=" * 55)
-    print("WANING 1.5 API READY")
-    print("Model:", MODEL_NAME)
-    print("Parameters:", f"{parameter_count:,}")
-    print("Device:", DEVICE)
-    print("=" * 55)
+    logger.info("=" * 55)
+    logger.info("WANING 1.5 API READY")
+    logger.info("Parameters: %s", f"{parameter_count:,}")
+    logger.info("Device: %s", DEVICE)
+    logger.info("Maximum generation: %s", MAX_NEW_TOKENS)
+    logger.info("=" * 55)
